@@ -1,0 +1,12 @@
+*.swp
+*.pyc
+__pycache__
+*.tar
+checkpoint*
+images*
+logs*
+event*
+*.bin
+data
+old
+.ipynb_checkpoints*
