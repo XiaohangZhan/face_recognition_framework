@@ -52,9 +52,9 @@ def load_state(path, model, optimizer=None):
         log("=> loading checkpoint '{}'".format(path))
         checkpoint = torch.load(path)
         model.load_state_dict(checkpoint['state_dict'], strict=False)
+        log("=> loaded checkpoint '{}' (epoch {} iteration {})".format(path, checkpoint['epoch'], checkpoint['count']))
         if optimizer is not None:
             optimizer.load_state_dict(checkpoint['optimizer'])
-            log("=> loaded checkpoint '{}' (epoch {} iteration {})".format(path, checkpoint['epoch'], checkpoint['count']))
             return checkpoint
     else:
         log("=> no checkpoint found at '{}'".format(path))

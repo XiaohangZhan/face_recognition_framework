@@ -1,4 +1,4 @@
-workers: 16
+workers: 32
 memcached: True
 memcached_client: "/mnt/lustre/share/memcached_client"
 
@@ -8,25 +8,25 @@ model:
 
 transform:
     crop_size: 112
-    final_size: 224
+    final_size: 112
     crop_center_y_offset: 15
 
 train:
     rand_seed: 0
-    batch_size: [64]
+    batch_size: [384]
     loss_weight: [1.0]
-    max_epoch: 11
-    base_lr: 0.3
+    base_lr: 0.5
     lr_decay_scale: 0.1
-    lr_decay_steps: [6, 9]
+    lr_decay_steps: [16, 24]
+    max_epoch: 28
     momentum: 0.9
     weight_decay: 0.0001
-    print_freq: 20
+    print_freq: 100
     average_stats: 100
     augmentation:
         flip_aug: False
-        scale_aug: 0.04
-        trans_aug: 0.02
+        scale_aug: 0.02
+        trans_aug: 0.01
     data_root:
         - '/mnt/lustre/zhouyucong/verify/datasets/emore/aligned'
     data_list:
@@ -43,8 +43,9 @@ val:
 
 test:
     flag: True
+    interval: 2
     benchmark: megaface
-    batch_size: 64
+    batch_size: 420
     probe_root: 'data/megaface/facescrub3530/Images_aligned'
     probe_list: 'data/megaface/facescrub3530/db_aligned.txt'
     distractor_root: 'data/megaface/megaface_distractor/Images_aligned'

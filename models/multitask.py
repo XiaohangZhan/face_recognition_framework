@@ -41,9 +41,9 @@ class ArcMultiTask(nn.Module):
 
 class BasicMultiTask(nn.Module):
 
-    def __init__(self, backbone, num_classes, feature_dim):
+    def __init__(self, backbone, num_classes, feature_dim, spatial_size):
         super(BasicMultiTask, self).__init__()
-        self.basemodel = backbones.__dict__[backbone](feature_dim=feature_dim)
+        self.basemodel = backbones.__dict__[backbone](feature_dim=feature_dim, spatial_size=spatial_size)
         if num_classes is not None:
             self.num_tasks = len(num_classes)
             self.fcs = nn.ModuleList([nn.Linear(feature_dim, num_classes[k]) for k in range(self.num_tasks)])

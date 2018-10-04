@@ -162,7 +162,7 @@ class GivenSizeSampler(Sampler):
 
         # add extra samples to meet self.total_size
         extra = self.total_size - len(origin_indices)
-        print('Origin Size: {}\t Modified Size: {}'.format(len(origin_indices), self.total_size))
+        print('Origin Size: {}\tAligned Size: {}'.format(len(origin_indices), self.total_size))
         if extra < 0:
             indices = indices[:self.total_size]
         while extra > 0:

@@ -85,7 +85,8 @@ class Bottleneck(nn.Module):
 
 class ResNet(nn.Module):
 
-    def __init__(self, block, layers, feature_dim):
+    def __init__(self, block, layers, feature_dim, spatial_size=224):
+        fc_map = {224: 12544, 112: 4096}
         self.inplanes = 64
         super(ResNet, self).__init__()
         self.feature_dim = feature_dim
@@ -105,7 +106,7 @@ class ResNet(nn.Module):
             nn.BatchNorm2d(256),
             nn.ReLU(inplace=False))
         self.drop1 = nn.Dropout(0.5)
-        self.feature = nn.Linear(12544, feature_dim)
+        self.feature = nn.Linear(fc_map[spatial_size], feature_dim)
         self.drop2 = nn.Dropout(0.5)
 
         for m in self.modules():

@@ -1,3 +1,7 @@
+import multiprocessing as mp
+if mp.get_start_method(allow_none=True) != 'spawn':
+    mp.set_start_method('spawn', force=True)
+
 import argparse
 import os
 import time
@@ -83,7 +87,7 @@ def main():
 
         train_dataset = [FaceDataset(args, idx, 'train') for idx in range(num_tasks)]
         args.num_classes = [td.num_class for td in train_dataset]
-        train_longest_size = max([len(td) // bs for td, bs in zip(train_dataset, args.train.batch_size)])
+        train_longest_size = max([int(np.ceil(len(td) / float(bs))) for td, bs in zip(train_dataset, args.train.batch_size)])
         train_sampler = [GivenSizeSampler(td, total_size=train_longest_size * bs, rand_seed=args.train.rand_seed) for td, bs in zip(train_dataset, args.train.batch_size)]
         train_loader = [DataLoader(
             train_dataset[k], batch_size=args.train.batch_size[k], shuffle=False,
@@ -95,8 +99,8 @@ def main():
                 args.val.batch_size[i] *= args.ngpu
     
             val_dataset = [FaceDataset(args, idx, 'val') for idx in range(num_tasks)]
-            val_longest_size = max([len(vd) // bs for vd, bs in zip(val_dataset, args.val.batch_size)])
-            val_sampler = [GivenSizeSampler(vd, total_size=val_longest_size * bs, rand_seed=0) for vd, bs in zip(val_dataset, args.val.batch_size)]
+            val_longest_size = max([int(np.ceil(len(vd) / float(bs))) for vd, bs in zip(val_dataset, args.val.batch_size)])
+            val_sampler = [GivenSizeSampler(vd, total_size=val_longest_size * bs, sequential=True) for vd, bs in zip(val_dataset, args.val.batch_size)]
             val_loader = [DataLoader(
                 val_dataset[k], batch_size=args.val.batch_size[k], shuffle=False,
                 num_workers=args.workers, pin_memory=False, sampler=val_sampler[k]) for k in range(num_tasks)]
@@ -113,7 +117,7 @@ def main():
     ## create model
     if args.evaluate:
         args.num_classes = None
-    model = models.BasicMultiTask(backbone=args.model.backbone, num_classes=args.num_classes, feature_dim=args.model.feature_dim)
+    model = models.BasicMultiTask(backbone=args.model.backbone, num_classes=args.num_classes, feature_dim=args.model.feature_dim, spatial_size=args.transform.final_size)
     devices = list(range(args.ngpu))
     model = nn.DataParallel(model, device_ids=devices)
     model.cuda()
@@ -137,6 +141,13 @@ def main():
         else:
             load_state(args.load_path, model)
 
+    ## offline evaluate
+    if args.evaluate:
+        evaluation(test_loader, model, num=len(test_dataset), outfeat_fn="{}_{}.bin".format(args.load_path[:-8], args.test.benchmark))
+        return
+
+
+    ######################## train #################
     ## lr scheduler
     lr_scheduler = torch.optim.lr_scheduler.MultiStepLR(optimizer, args.train.lr_decay_steps, gamma=args.train.lr_decay_scale, last_epoch=start_epoch-1)
 
@@ -147,24 +158,23 @@ def main():
         level=logging.INFO)
     tb_logger = SummaryWriter('{}/events'.format(args.save_path))
 
-    ##  validate
+    ## initial validate
     if args.val.flag:
         validate(val_loader, model, criterion, 0, args.train.loss_weight, len(train_loader[0]), tb_logger)
 
-    ## offline evaluate
-    if args.evaluate:
-        evaluation(test_loader, model, num=len(test_dataset), outfeat_fn="{}_{}.bin".format(args.load_path[:-8], args.test.benchmark))
-        return
+    ## initial evaluate
+    if args.test.flag and True:
+        log("*************** evaluation epoch [{}] ***************".format(0))
+        res = evaluation(test_loader, model, num=len(test_dataset), outfeat_fn="{}/checkpoints/ckpt_epoch_{}_{}.bin".format(args.save_path, 0, args.test.benchmark))
+        tb_logger.add_scalar('megaface', res, 0)
 
     ## training loop
     for epoch in range(start_epoch, args.train.max_epoch):
         lr_scheduler.step()
         for ts in train_sampler:
             ts.set_epoch(epoch)
-
         # train for one epoch
         train(train_loader, model, criterion, optimizer, epoch, args.train.loss_weight, tb_logger, count)
-
         # save checkpoint
         save_state({
             'epoch': epoch + 1,
@@ -172,15 +182,15 @@ def main():
             'state_dict': model.state_dict(),
             'optimizer' : optimizer.state_dict(),
             'count': count[0]
-        }, args.save_path + "/checkpoints/ckpt_epoch", epoch, is_last=(epoch==args.train.max_epoch-1))
+        }, args.save_path + "/checkpoints/ckpt_epoch", epoch + 1, is_last=(epoch + 1 == args.train.max_epoch))
         # validate
         if args.val.flag:
             validate(val_loader, model, criterion, epoch, args.train.loss_weight, len(train_loader[0]), tb_logger, count)
-
         # online evaluate
-        if args.test.flag:
-            log("*************** evaluation epoch [{}] ***************".format(epoch))
-            evaluation(test_loader, model, num=len(test_dataset), outfeat_fn="{}/checkpoints/ckpt_epoch_{}_{}.bin".format(args.save_path, epoch, args.test.benchmark))
+        if args.test.flag and (epoch + 1) % args.test.interval == 0:
+            log("*************** evaluation epoch [{}] ***************".format(epoch + 1))
+            res = evaluation(test_loader, model, num=len(test_dataset), outfeat_fn="{}/checkpoints/ckpt_epoch_{}_{}.bin".format(args.save_path, epoch + 1, args.test.benchmark))
+            tb_logger.add_scalar('megaface', res, epoch + 1)
 
 
 def train(train_loader, model, criterion, optimizer, epoch, loss_weight, tb_logger, count):
@@ -354,6 +364,7 @@ def evaluation(test_loader, model, num, outfeat_fn):
 
     r = test.test_megaface(features)
     log(' * Megaface: 1e-6 [{}], 1e-5 [{}], 1e-4 [{}]'.format(r[-1], r[-2], r[-3]))
+    return r[-1]
 
 
 if __name__ == '__main__':
