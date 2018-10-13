@@ -47,7 +47,7 @@ test:
     initial_test: True
     interval: 2
     benchmark: megaface
-    batch_size: 64
+    batch_size: 128
     probe_root: 'data/megaface/facescrub3530/Images_aligned'
     probe_list: 'data/megaface/facescrub3530/db_aligned.txt'
     distractor_root: 'data/megaface/megaface_distractor/Images_aligned'
