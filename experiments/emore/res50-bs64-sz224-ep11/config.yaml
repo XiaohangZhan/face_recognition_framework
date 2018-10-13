@@ -1,4 +1,5 @@
 workers: 16
+gpus: '0,1,2,3,4,5,6,7'
 memcached: True
 memcached_client: "/mnt/lustre/share/memcached_client"
 
@@ -15,10 +16,10 @@ train:
     rand_seed: 0
     batch_size: [64]
     loss_weight: [1.0]
-    max_epoch: 11
     base_lr: 0.3
     lr_decay_scale: 0.1
     lr_decay_steps: [6, 9]
+    max_epoch: 11
     momentum: 0.9
     weight_decay: 0.0001
     print_freq: 20
@@ -43,6 +44,8 @@ val:
 
 test:
     flag: True
+    initial_test: True
+    interval: 1
     benchmark: megaface
     batch_size: 64
     probe_root: 'data/megaface/facescrub3530/Images_aligned'

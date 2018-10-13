@@ -7,5 +7,4 @@ GLOG_vmodule=MemcachedClient=-1 srun --mpi=pmi2 -p Spring_1080 -x BJ-IDC1-10-10-
     python -u main.py \
     --config $work_path/config.yaml \
     --load-path $work_path/checkpoints/ckpt_epoch_10.pth.tar \
-    --evaluate \
-    --ngpu 8
+    --evaluate

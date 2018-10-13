@@ -45,7 +45,7 @@ val:
 test:
     flag: True
     initial_test: True
-    interval: 1
+    interval: 2
     benchmark: megaface
     batch_size: 64
     probe_root: 'data/megaface/facescrub3530/Images_aligned'

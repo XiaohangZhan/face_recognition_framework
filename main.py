@@ -324,33 +324,29 @@ def extract(ext_loader, model, output_file, total_size):
     log("Extracting Done. Total time: {}".format(time.time() - start))
 
 def evaluation(test_loader, model, num, outfeat_fn):
-    if not os.path.isfile(outfeat_fn):
-        batch_time = AverageMeter(9999999)
-        data_time = AverageMeter(9999999)
-        model.eval()
-        features = []
+    batch_time = AverageMeter(9999999)
+    data_time = AverageMeter(9999999)
+    model.eval()
+    features = []
     
-        start = time.time()
+    start = time.time()
+    end = time.time()
+    for i, (input, _) in enumerate(test_loader):
+        data_time.update(time.time() - end)
+        input_var = torch.autograd.Variable(input.cuda(), volatile=True)
+        output = model(input_var, extract_mode=True)
+        features.append(output.data.cpu().numpy())
+        batch_time.update(time.time() - end)
         end = time.time()
-        for i, (input, _) in enumerate(test_loader):
-            data_time.update(time.time() - end)
-            input_var = torch.autograd.Variable(input.cuda(), volatile=True)
-            output = model(input_var, extract_mode=True)
-            features.append(output.data.cpu().numpy())
-            batch_time.update(time.time() - end)
-            end = time.time()
     
-            if i % args.train.print_freq == 0:
-                log("Extracting: {0}/{1}\t"
-                        "Time {batch_time.val:.3f} ({batch_time.avg:.3f})\t"
-                        "Data {data_time.val:.3f} ({data_time.avg:.3f})".format(
-                        i, len(test_loader), batch_time=batch_time, data_time=data_time))
-        features = np.concatenate(features, axis=0)[:num, :]
-        features.tofile(outfeat_fn)
-        log("Extracting Done. Total time: {}".format(time.time() - start))
-    else:
-        log("Loading features: {}".format(outfeat_fn))
-        features = np.fromfile(outfeat_fn, dtype=np.float32).reshape(-1, args.model.feature_dim)
+        if i % args.train.print_freq == 0:
+            log("Extracting: {0}/{1}\t"
+                    "Time {batch_time.val:.3f} ({batch_time.avg:.3f})\t"
+                    "Data {data_time.val:.3f} ({data_time.avg:.3f})".format(
+                    i, len(test_loader), batch_time=batch_time, data_time=data_time))
+    features = np.concatenate(features, axis=0)[:num, :]
+    features.tofile(outfeat_fn)
+    log("Extracting Done. Total time: {}".format(time.time() - start))
 
     r = test.test_megaface(features)
     log(' * Megaface: 1e-6 [{}], 1e-5 [{}], 1e-4 [{}]'.format(r[-1], r[-2], r[-3]))
