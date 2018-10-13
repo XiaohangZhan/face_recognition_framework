@@ -5,7 +5,6 @@ from torch.utils.data.sampler import Sampler
 import numpy as np
 import os
 import io
-import cv2
 from PIL import Image
 import torchvision.transforms as transforms
 
@@ -15,10 +14,6 @@ def pil_loader(img_str):
         img = img.convert('RGB')
     return img
 
-def cv2_loader(img_str):
-    img_array = np.frombuffer(img_str, dtype=np.uint8)
-    return Image.fromarray(cv2.imdecode(img_array, cv2.IMREAD_COLOR))
-
 class FaceDataset(Dataset):
     def __init__(self, config, task_idx, phase):
         self.root_dir = config.train.data_root[task_idx]
@@ -27,7 +22,7 @@ class FaceDataset(Dataset):
         self.phase = phase
         
         if phase in ['train', 'val']:
-            print("Task #{}: building dataset from {} and {}".format(task_idx, config.train.data_list[task_idx], config.train.data_meta[task_idx]))
+            print("Building task #{} dataset from {} and {}".format(task_idx, config.train.data_list[task_idx], config.train.data_meta[task_idx]))
             with open(config.train.data_list[task_idx], 'r') as f:
                 lines = f.readlines()
                 self.lists = [os.path.join(config.train.data_root[task_idx], l.strip()) for l in lines]
@@ -40,7 +35,7 @@ class FaceDataset(Dataset):
             assert self.num_img == len(self.metas)
             assert self.num_class > max(self.metas)
         else: # test
-            print("Testing: building dataset from {} and {}".format(config.test.probe_list, config.test.distractor_list))
+            print("Building testing dataset from {} and {}".format(config.test.probe_list, config.test.distractor_list))
             self.lists = []
             self.num_img = 0
             with open(config.test.probe_list, 'r') as f:
@@ -80,7 +75,6 @@ class FaceDataset(Dataset):
             self.mclient.Get(filename, value)
             value_str = mc.ConvertBuffer(value)
             img = pil_loader(value_str)
-            #img = cv2_loader(value_str)
         except:
             print('Read image[{}] failed ({})'.format(idx, filename))
             return self._read_one()

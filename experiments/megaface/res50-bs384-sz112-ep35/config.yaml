@@ -13,26 +13,26 @@ transform:
 
 train:
     rand_seed: 0
-    batch_size: [256]
+    batch_size: [384]
     loss_weight: [1.0]
-    max_epoch: 17
-    base_lr: 0.3
+    base_lr: 0.5
     lr_decay_scale: 0.1
-    lr_decay_steps: [10, 15]
+    lr_decay_steps: [20, 30]
+    max_epoch: 35
     momentum: 0.9
     weight_decay: 0.0001
-    print_freq: 20
+    print_freq: 100
     average_stats: 100
     augmentation:
         flip_aug: False
-        scale_aug: 0.04
-        trans_aug: 0.02
+        scale_aug: 0.02
+        trans_aug: 0.01
     data_root:
-        - '/mnt/lustre/zhouyucong/verify/datasets/emore/aligned'
+        - 'data/megaface_train/clean'
     data_list:
-        - 'data/emore/list.txt'
+        - 'data/megaface_train/list.txt'
     data_meta:
-        - 'data/emore/meta.txt'
+        - 'data/megaface_train/meta.txt'
 
 val:
     flag: False
@@ -43,8 +43,10 @@ val:
 
 test:
     flag: True
+    initial_test: True
+    interval: 2
     benchmark: megaface
-    batch_size: 64
+    batch_size: 384
     probe_root: 'data/megaface/facescrub3530/Images_aligned'
     probe_list: 'data/megaface/facescrub3530/db_aligned.txt'
     distractor_root: 'data/megaface/megaface_distractor/Images_aligned'

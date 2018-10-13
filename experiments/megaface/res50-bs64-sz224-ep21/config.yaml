@@ -1,4 +1,5 @@
-workers: 32
+workers: 16 # total workers
+gpus: '0,1,2,3,4,5,6,7'
 memcached: True
 memcached_client: "/mnt/lustre/share/memcached_client"
 
@@ -8,20 +9,20 @@ model:
 
 transform:
     crop_size: 112
-    final_size: 112
+    final_size: 224
     crop_center_y_offset: 15
 
 train:
     rand_seed: 0
-    batch_size: [256]
+    batch_size: [64] # batch size for each gpu
     loss_weight: [1.0]
-    max_epoch: 17
-    base_lr: 0.5
+    base_lr: 0.3
     lr_decay_scale: 0.1
-    lr_decay_steps: [10, 15]
+    lr_decay_steps: [12, 18]
+    max_epoch: 21
     momentum: 0.9
     weight_decay: 0.0001
-    print_freq: 20
+    print_freq: 100
     average_stats: 100
     augmentation:
         flip_aug: False
@@ -43,6 +44,8 @@ val:
 
 test:
     flag: True
+    initial_test: True
+    interval: 1
     benchmark: megaface
     batch_size: 64
     probe_root: 'data/megaface/facescrub3530/Images_aligned'

@@ -37,7 +37,6 @@ parser.add_argument('--load-path', default='', type=str)
 parser.add_argument('--resume', action='store_true')
 parser.add_argument('--evaluate', action='store_true')
 parser.add_argument('--extract', action='store_true')
-parser.add_argument('--ngpu', type=int, default=1)
 
 def main():
 
@@ -56,6 +55,7 @@ def main():
                 setattr(argobj, kk, vv)
         else:
             setattr(args, k, v)
+    args.ngpu = len(args.gpus.split(','))
 
     ## asserts
     assert args.model.backbone in model_names, "available backbone names: {}".format(model_names)
@@ -115,16 +115,16 @@ def main():
             num_workers=args.workers, pin_memory=False, sampler=test_sampler)
 
     ## create model
+    log("Creating model on [{}] gpus: {}".format(args.ngpu, args.gpus))
     if args.evaluate:
         args.num_classes = None
-    model = models.BasicMultiTask(backbone=args.model.backbone, num_classes=args.num_classes, feature_dim=args.model.feature_dim, spatial_size=args.transform.final_size)
-    devices = list(range(args.ngpu))
-    model = nn.DataParallel(model, device_ids=devices)
+    model = models.BasicMultiTaskWithLoss(backbone=args.model.backbone, num_classes=args.num_classes, feature_dim=args.model.feature_dim, spatial_size=args.transform.final_size)
+    os.environ["CUDA_VISIBLE_DEVICES"] = args.gpus
+    model = nn.DataParallel(model)
     model.cuda()
     cudnn.benchmark = True
 
     ## criterion and optimizer
-    criterion = nn.CrossEntropyLoss()
     optimizer = torch.optim.SGD(model.parameters(), args.train.base_lr,
                                 momentum=args.train.momentum,
                                 weight_decay=args.train.weight_decay)
@@ -160,13 +160,13 @@ def main():
 
     ## initial validate
     if args.val.flag:
-        validate(val_loader, model, criterion, 0, args.train.loss_weight, len(train_loader[0]), tb_logger)
+        validate(val_loader, model, start_epoch, args.train.loss_weight, len(train_loader[0]), tb_logger)
 
     ## initial evaluate
-    if args.test.flag and True:
-        log("*************** evaluation epoch [{}] ***************".format(0))
-        res = evaluation(test_loader, model, num=len(test_dataset), outfeat_fn="{}/checkpoints/ckpt_epoch_{}_{}.bin".format(args.save_path, 0, args.test.benchmark))
-        tb_logger.add_scalar('megaface', res, 0)
+    if args.test.flag and args.test.initial_test:
+        log("*************** evaluation epoch [{}] ***************".format(start_epoch))
+        res = evaluation(test_loader, model, num=len(test_dataset), outfeat_fn="{}/checkpoints/ckpt_epoch_{}_{}.bin".format(args.save_path, start_epoch, args.test.benchmark))
+        tb_logger.add_scalar('megaface', res, start_epoch)
 
     ## training loop
     for epoch in range(start_epoch, args.train.max_epoch):
@@ -174,7 +174,7 @@ def main():
         for ts in train_sampler:
             ts.set_epoch(epoch)
         # train for one epoch
-        train(train_loader, model, criterion, optimizer, epoch, args.train.loss_weight, tb_logger, count)
+        train(train_loader, model, optimizer, epoch, args.train.loss_weight, tb_logger, count)
         # save checkpoint
         save_state({
             'epoch': epoch + 1,
@@ -185,15 +185,15 @@ def main():
         }, args.save_path + "/checkpoints/ckpt_epoch", epoch + 1, is_last=(epoch + 1 == args.train.max_epoch))
         # validate
         if args.val.flag:
-            validate(val_loader, model, criterion, epoch, args.train.loss_weight, len(train_loader[0]), tb_logger, count)
+            validate(val_loader, model, epoch, args.train.loss_weight, len(train_loader[0]), tb_logger, count)
         # online evaluate
-        if args.test.flag and (epoch + 1) % args.test.interval == 0:
+        if args.test.flag and ((epoch + 1) % args.test.interval == 0 or epoch + 1 == args.train.max_epoch):
             log("*************** evaluation epoch [{}] ***************".format(epoch + 1))
             res = evaluation(test_loader, model, num=len(test_dataset), outfeat_fn="{}/checkpoints/ckpt_epoch_{}_{}.bin".format(args.save_path, epoch + 1, args.test.benchmark))
             tb_logger.add_scalar('megaface', res, epoch + 1)
 
 
-def train(train_loader, model, criterion, optimizer, epoch, loss_weight, tb_logger, count):
+def train(train_loader, model, optimizer, epoch, loss_weight, tb_logger, count):
     num_tasks = len(train_loader)
     batch_time = AverageMeter(args.train.average_stats)
     data_time = AverageMeter(args.train.average_stats)
@@ -220,11 +220,8 @@ def train(train_loader, model, criterion, optimizer, epoch, loss_weight, tb_logg
         input_var = torch.autograd.Variable(input.cuda())
         target_var = [torch.autograd.Variable(tg) for tg in target]
 
-        # compute output
-        output = model(input_var, slice_idx)
-
         # measure accuracy and record loss
-        loss = [criterion(op, tv) for op, tv in zip(output, target_var)]
+        loss = model(input_var, target_var, slice_idx)
 
         for k in range(num_tasks):
             losses[k].update(loss[k].data[0])
@@ -233,7 +230,7 @@ def train(train_loader, model, criterion, optimizer, epoch, loss_weight, tb_logg
         optimizer.zero_grad()
         loss_total = 0.
         for k in range(num_tasks):
-            loss_total = loss_total + loss[k] * loss_weight[k]
+            loss_total = loss_total + loss[k].mean() * loss_weight[k]
         loss_total.backward()
         optimizer.step()
 
@@ -243,7 +240,7 @@ def train(train_loader, model, criterion, optimizer, epoch, loss_weight, tb_logg
 
         # info
         if i % args.train.print_freq == 0:
-            log('Epoch: [{0}][{1}/{2}][{3}]    '
+            log('Progress: [{0}][{1}/{2}][{3}]    '
                   'Lr: {4:.2g}    '
                   'Time {batch_time.val:.3f} ({batch_time.avg:.3f})    '
                   'Data {data_time.val:.3f} ({data_time.avg:.3f})'.format(
@@ -287,11 +284,8 @@ def validate(val_loader, model, criterion, epoch, loss_weight, train_len, tb_log
         input_var = torch.autograd.Variable(input.cuda(), volatile=True)
         target_var = [torch.autograd.Variable(tg, volatile=True) for tg in target]
 
-        # compute output
-        output = model(input_var, slice_idx)
-
         # measure accuracy and record loss
-        loss = [criterion(op, tv) for op, tv in zip(output, target_var)]
+        loss = model(input_var, target_var, slice_idx)
 
         for k in range(num_tasks):
             losses[k].update(loss[k].data[0])
@@ -303,7 +297,7 @@ def validate(val_loader, model, criterion, epoch, loss_weight, train_len, tb_log
     for k in range(num_tasks):
         tb_logger.add_scalar('val_loss_{}'.format(k), losses[k].val, count[0])
 
-def extract(ext_loader, model, output_file, total_size, predict=False):
+def extract(ext_loader, model, output_file, total_size):
     batch_time = AverageMeter(9999999)
     data_time = AverageMeter(9999999)
     model.eval()
@@ -314,12 +308,8 @@ def extract(ext_loader, model, output_file, total_size, predict=False):
     for i, (input, _) in enumerate(ext_loader):
         data_time.update(time.time() - end)
         input_var = torch.autograd.Variable(input.cuda(), volatile=True)
-        if predict:
-            output = model(input_var, slice_idx=[0, input_var.size(0)])
-            features.append(output[0].data.cpu().numpy().argmax(axis=1))
-        else:
-            output = model(input_var, extract_mode=True)
-            features.append(output.data.cpu().numpy())
+        output = model(input_var, extract_mode=True)
+        features.append(output.data.cpu().numpy())
         batch_time.update(time.time() - end)
         end = time.time()
 
@@ -364,6 +354,8 @@ def evaluation(test_loader, model, num, outfeat_fn):
 
     r = test.test_megaface(features)
     log(' * Megaface: 1e-6 [{}], 1e-5 [{}], 1e-4 [{}]'.format(r[-1], r[-2], r[-3]))
+    with open(outfeat_fn[:-4] + ".txt", 'w') as f:
+        f.write(' * Megaface: 1e-6 [{}], 1e-5 [{}], 1e-4 [{}]'.format(r[-1], r[-2], r[-3]))
     return r[-1]
 
 
