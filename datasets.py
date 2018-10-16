@@ -84,7 +84,7 @@ class FaceDataset(Dataset):
     def __getitem__(self, idx):
         self.__init_memcached()
         ## memcached
-        if self.config.memcached:
+        if self.config.memcached and self.phase != "test":
             img, label = self._read_one(idx)
         else:
             filename = self.lists[idx]
@@ -92,6 +92,8 @@ class FaceDataset(Dataset):
                 label = self.metas[idx]
             else:
                 label = None
+            if not os.path.isfile(filename):
+                raise Exception('Read image[{}] failed ({})'.format(idx, filename))
             img = Image.open(filename).convert('RGB')
 
         ## transform & aug
