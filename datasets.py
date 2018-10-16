@@ -91,7 +91,7 @@ class FaceDataset(Dataset):
             if self.metas is not None:
                 label = self.metas[idx]
             else:
-                label = None
+                label = 0
             if not os.path.isfile(filename):
                 raise Exception('Read image[{}] failed ({})'.format(idx, filename))
             img = Image.open(filename).convert('RGB')

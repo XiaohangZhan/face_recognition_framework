@@ -4,9 +4,6 @@ import pdb
 import time
 import multiprocessing as mp
 
-sys.path.append('/mnt/lustre/zhouyucong/infrastructure/faiss_py3')
-import faiss
-
 from .compute_roc import compute_roc_points
 
 __all__ = ["test_megaface", "test_megaface_roc"]
@@ -122,64 +119,6 @@ def worker(feat, topk_score, idx, cos_margin):
 #def compute_rank(feat_prob, feat_distractor, labels, n_dist, cos_margin):
 
 
-def compute_rank_faiss(feat_prob, feat_distractor, labels, n_dist, cos_margin):
-
-    feat_dim = feat_prob.shape[1]
-
-    #ngpu = len(os.environ['CUDA_VISIBLE_DEVICES'].split(','))
-    ngpu = 2
-    flat_config = []
-    for i in range(ngpu):
-        cfg = faiss.GpuIndexFlatConfig()
-        cfg.useFloat16 = False
-        cfg.device = i
-        flat_config.append(cfg)
-
-    res = [faiss.StandardGpuResources() for i in range(ngpu)]
-    indexes = [faiss.GpuIndexFlatIP(res[i], feat_dim, flat_config[i]) for i in range(ngpu)]
-    index = faiss.IndexProxy()
-    for sub_index in indexes:
-        index.addIndex(sub_index)
-
-    max_query = 1024
-    label_map = {}
-    for i,l in enumerate(labels):
-        if l in label_map:
-            label_map[l].append(i)
-        else:
-            label_map[l] = [i]
-
-    index.reset()
-    index.add(feat_distractor)
-    n_dist = min(n_dist, feat_distractor.shape[0])
-
-    hit = 0
-    n = 0
-    hit_idx = []
-    hit_score = []
-    miss_idx = []
-    miss_score = []
-    dis_idx = []
-    dis_score = []
-    for l, idx in label_map.items():
-        idx = np.array(idx)
-        assert len(idx) < max_query, 'number of images of label {} ({}) > {}'.format(l, len(idx), max_query)
-        this_feat = feat_prob[idx,:]
-        this_topk_score, this_topk_idx = index.search(this_feat, n_dist)
-
-        this_hit, this_n, a, b, c, d = worker(this_feat, this_topk_score[:,0], idx, cos_margin)
-        hit += this_hit
-        n += this_n
-        hit_idx.extend(a)
-        hit_score.extend(b)
-        miss_idx.extend(c)
-        miss_score.extend(d)
-        dis_idx.extend(list(map(list, this_topk_idx)))
-        dis_score.extend(list(map(list, this_topk_score)))
-
-    return hit / n, hit_idx, hit_score, miss_idx, miss_score, dis_idx, dis_score
-
-
 def test_megaface(features):
     prob_feat = features[:probe_num, :]
     dist_feat = features[probe_num:, :]
@@ -203,32 +142,6 @@ def test_megaface(features):
             results.append(res[0])
 
     return results
-
-def test_megaface_faiss(features):
-    probe_feat = features[:probe_num, :]
-    dist_feat = features[probe_num:, :]
-    with open(label_file, 'r') as f:
-        lines = f.readlines()
-        num_img, num_id = map(int, lines[0].rstrip().split())
-        labels = [int(x.strip()) for x in lines[1:]]
-        prob_label = np.array(labels)
-
-    results = []
-    for dis_size in [10000, 100000, 1000000]:
-        with open('../msics/id_%d_clean'%dis_size) as f:
-            print('testing: distractor %d:...'%len(idx), end='')
-            lines = f.readlines()
-            lines = [int(x.strip())-1 for x in lines]
-            idx = np.array(lines)
-            t0 = time.time()
-            res, hit_idx, hit_score, miss_idx, miss_score, dis_idx, dis_score = \
-            compute_rank(prob_feat, dist_feat[idx,:], labels, n_dist, cos_margin)
-            t1 = time.time()
-            print('top-1=%.2f, in %fs'%(res*100, t1-t0))
-            results.append(res)
-
-    return results
-
 
 
 def roc_evaluation(feats, labels, dist_feats):
