@@ -119,9 +119,6 @@ def main():
     if args.evaluate:
         args.num_classes = None
     model = models.BasicMultiTaskWithLoss(backbone=args.model.backbone, num_classes=args.num_classes, feature_dim=args.model.feature_dim, spatial_size=args.transform.final_size)
-    os.environ["CUDA_VISIBLE_DEVICES"] = args.gpus
-    model = nn.DataParallel(model)
-    model.cuda()
     cudnn.benchmark = True
 
     ## criterion and optimizer
@@ -140,6 +137,10 @@ def main():
             count[0] = checkpoint['count']
         else:
             load_state(args.load_path, model)
+
+    os.environ["CUDA_VISIBLE_DEVICES"] = args.gpus
+    model = nn.DataParallel(model)
+    model.cuda()
 
     ## offline evaluate
     if args.evaluate:
