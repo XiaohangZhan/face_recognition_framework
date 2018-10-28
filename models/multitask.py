@@ -11,8 +11,8 @@ class ArcMultiTaskWithLoss(nn.Module):
         if num_classes is not None:
             self.num_tasks = len(num_classes)
             self.arc_fc = arc_fc
-            print(arc_fc, s, m, is_pw, is_hard)
-            self.dropout = nn.Dropout(p=0.5)
+            #print(arc_fc, s, m, is_pw, is_hard)
+            #self.dropout = nn.Dropout(p=0.5)
             if not arc_fc:
                 self.fcs = nn.ModuleList([nn.Linear(feature_dim, num_classes[k]) for k in range(self.num_tasks)])
             else:

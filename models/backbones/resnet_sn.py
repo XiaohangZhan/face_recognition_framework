@@ -109,7 +109,7 @@ class ResNet(nn.Module):
             nn.ReLU(inplace=False))
         self.drop1 = nn.Dropout(0.5)
         self.feature = nn.Linear(fc_map[spatial_size], feature_dim)
-        self.drop2 = nn.Dropout(0.5)
+        #self.drop2 = nn.Dropout(0.5)
         if feat_bn:
             self.bn_feat = nn.BatchNorm1d(feature_dim, affine=False, eps=2e-5, momentum=0.9)
 
@@ -158,7 +158,7 @@ class ResNet(nn.Module):
         x = self.drop1(x)
         x = x.view(x.size(0), -1)
         x = self.feature(x)
-        x = self.drop2(x)
+        #x = self.drop2(x)
         if self.feat_bn:
             x = self.bn_feat(x)
 
