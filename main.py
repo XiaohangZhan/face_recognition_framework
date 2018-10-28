@@ -118,7 +118,10 @@ def main():
     log("Creating model on [{}] gpus: {}".format(args.ngpu, args.gpus))
     if args.evaluate:
         args.num_classes = None
-    model = models.BasicMultiTaskWithLoss(backbone=args.model.backbone, num_classes=args.num_classes, feature_dim=args.model.feature_dim, spatial_size=args.transform.final_size)
+    model = models.ArcMultiTaskWithLoss(backbone=args.model.backbone, num_classes=args.num_classes, feature_dim=args.model.feature_dim, spatial_size=args.transform.final_size, arc_fc=args.model.arc_fc)
+    os.environ["CUDA_VISIBLE_DEVICES"] = args.gpus
+    model = nn.DataParallel(model)
+    model.cuda()
     cudnn.benchmark = True
 
     ## criterion and optimizer
@@ -138,13 +141,9 @@ def main():
         else:
             load_state(args.load_path, model)
 
-    os.environ["CUDA_VISIBLE_DEVICES"] = args.gpus
-    model = nn.DataParallel(model)
-    model.cuda()
-
     ## offline evaluate
     if args.evaluate:
-        evaluation(test_loader, model, num=len(test_dataset), outfeat_fn="{}_{}.bin".format(args.load_path[:-8], args.test.benchmark))
+        evaluation(test_loader, model, num=len(test_dataset), outfeat_fn="{}_{}.bin".format(args.load_path[:-8], args.test.benchmark), benchmark=args.test.benchmark)
         return
 
 
@@ -166,8 +165,13 @@ def main():
     ## initial evaluate
     if args.test.flag and args.test.initial_test:
         log("*************** evaluation epoch [{}] ***************".format(start_epoch))
-        res = evaluation(test_loader, model, num=len(test_dataset), outfeat_fn="{}/checkpoints/ckpt_epoch_{}_{}.bin".format(args.save_path, start_epoch, args.test.benchmark))
-        tb_logger.add_scalar('megaface', res, start_epoch)
+        res = evaluation(test_loader, model, num=len(test_dataset), outfeat_fn="{}/checkpoints/ckpt_epoch_{}_{}.bin".format(args.save_path, start_epoch, args.test.benchmark), benchmark=args.test.benchmark)
+        if args.test.benchmark == "megaface":
+            tb_logger.add_scalar('megaface', res, start_epoch)
+        elif args.test.benchmark == "ijba":
+            tb_logger.add_scalar('ijba', res, start_epoch)
+        else:
+            raise Exception("No such benchmark: {}".format(args.test.benchmark))
 
     ## training loop
     for epoch in range(start_epoch, args.train.max_epoch):
@@ -190,8 +194,13 @@ def main():
         # online evaluate
         if args.test.flag and ((epoch + 1) % args.test.interval == 0 or epoch + 1 == args.train.max_epoch):
             log("*************** evaluation epoch [{}] ***************".format(epoch + 1))
-            res = evaluation(test_loader, model, num=len(test_dataset), outfeat_fn="{}/checkpoints/ckpt_epoch_{}_{}.bin".format(args.save_path, epoch + 1, args.test.benchmark))
-            tb_logger.add_scalar('megaface', res, epoch + 1)
+            res = evaluation(test_loader, model, num=len(test_dataset), outfeat_fn="{}/checkpoints/ckpt_epoch_{}_{}.bin".format(args.save_path, epoch + 1, args.test.benchmark), benchmark=args.test.benchmark)
+            if args.test.benchmark == "megaface":
+                tb_logger.add_scalar('megaface', res, epoch + 1)
+            elif args.test.benchmark == "ijba":
+                tb_logger.add_scalar('ijba', res, epoch + 1)
+            else:
+                raise Exception("No such benchmark: {}".format(args.test.benchmark))
 
 
 def train(train_loader, model, optimizer, epoch, loss_weight, tb_logger, count):
@@ -324,7 +333,7 @@ def extract(ext_loader, model, output_file, total_size):
     features[:total_size,...].tofile(output_file)
     log("Extracting Done. Total time: {}".format(time.time() - start))
 
-def evaluation(test_loader, model, num, outfeat_fn):
+def evaluation(test_loader, model, num, outfeat_fn, benchmark):
     batch_time = AverageMeter(9999999)
     data_time = AverageMeter(9999999)
     model.eval()
@@ -349,11 +358,18 @@ def evaluation(test_loader, model, num, outfeat_fn):
     features.tofile(outfeat_fn)
     log("Extracting Done. Total time: {}".format(time.time() - start))
 
-    r = test.test_megaface(features)
-    log(' * Megaface: 1e-6 [{}], 1e-5 [{}], 1e-4 [{}]'.format(r[-1], r[-2], r[-3]))
-    with open(outfeat_fn[:-4] + ".txt", 'w') as f:
-        f.write(' * Megaface: 1e-6 [{}], 1e-5 [{}], 1e-4 [{}]'.format(r[-1], r[-2], r[-3]))
-    return r[-1]
+    if benchmark == "megaface":
+        r = test.test_megaface(features)
+        log(' * Megaface: 1e-6 [{}], 1e-5 [{}], 1e-4 [{}]'.format(r[-1], r[-2], r[-3]))
+        with open(outfeat_fn[:-4] + ".txt", 'w') as f:
+            f.write(' * Megaface: 1e-6 [{}], 1e-5 [{}], 1e-4 [{}]'.format(r[-1], r[-2], r[-3]))
+        return r[-1]
+    elif benchmark == "ijba":
+        r = test.test_ijba(features)
+        log(' * IJB-A: {} [{}], {} [{}], {} [{}]'.format(r[0][0], r[0][1], r[1][0], r[1][1], r[2][0], r[2][1]))
+        with open(outfeat_fn[:-4] + "_ijba.txt", 'w') as f:
+            f.write(' * IJB-A: {} [{}], {} [{}], {} [{}]'.format(r[0][0], r[0][1], r[1][0], r[1][1], r[2][0], r[2][1]))
+        return r[2][1]
 
 
 if __name__ == '__main__':

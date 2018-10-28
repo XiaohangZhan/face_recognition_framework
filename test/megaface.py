@@ -10,6 +10,11 @@ __all__ = ["test_megaface", "test_megaface_roc"]
 
 probe_num = 3530
 label_file = 'data/megaface/facescrub3530/image_list.label.meta'
+probe_root = "data/megaface/facescrub3530/Images_aligned"
+probe_list = "data/megaface/facescrub3530/db_aligned.txt"
+distractor_root = "data/megaface/megaface_distractor/Images_aligned"
+distractor_list = "data/megaface/megaface_distractor/db_aligned.txt"
+
 # probe_num = 3964
 # label_file = '/mnt/lustre/zhouyucong/verify/testsets/train/megaface_probe_3964/image_list.label.meta'
 # distractor_num = 992919
@@ -208,3 +213,12 @@ def test_megaface_roc(features):
 
     return results
 
+def build_testset():
+    lists = []
+    with open(probe_list, 'r') as f:
+        lines = f.readlines()
+        lists.extend([os.path.join(probe_root, l.strip()) for l in lines])
+    with open(distractor_list, 'r') as f:
+        lines = f.readlines()
+        lists.extend([os.path.join(distractor_root, l.strip()) for l in lines])
+    return lists

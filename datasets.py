@@ -5,6 +5,7 @@ from torch.utils.data.sampler import Sampler
 import numpy as np
 import os
 import io
+import test
 from PIL import Image
 import torchvision.transforms as transforms
 
@@ -35,17 +36,11 @@ class FaceDataset(Dataset):
             assert self.num_img == len(self.metas)
             assert self.num_class > max(self.metas)
         else: # test
-            print("Building testing dataset from {} and {}".format(config.test.probe_list, config.test.distractor_list))
-            self.lists = []
-            self.num_img = 0
-            with open(config.test.probe_list, 'r') as f:
-                lines = f.readlines()
-                self.lists.extend([os.path.join(config.test.probe_root, l.strip()) for l in lines])
-                self.num_img += len(lines)
-            with open(config.test.distractor_list, 'r') as f:
-                lines = f.readlines()
-                self.lists.extend([os.path.join(config.test.distractor_root, l.strip()) for l in lines])
-                self.num_img += len(lines)
+            if config.test.benchmark == "megaface":
+                self.lists = test.megaface.build_testset()
+            elif config.test.benchmark == "ijba":
+                self.lists = test.ijba.build_testset()
+            self.num_img = len(self.lists)
             self.metas = None
 
         normalize = transforms.Normalize(mean=[0.5, 0.5, 0.5], std=[0.3125, 0.3125, 0.3125])
@@ -63,7 +58,7 @@ class FaceDataset(Dataset):
             self.initialized = True
 
     def _read_one(self, idx=None):
-        if idx == None:
+        if idx is None:
             idx = np.random.randint(self.num_img)
         filename = self.lists[idx]
         if self.metas is not None:

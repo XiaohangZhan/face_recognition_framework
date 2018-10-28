@@ -2,7 +2,7 @@ import torch.nn as nn
 import math
 from .switchable_norm import SwitchNorm2d
 
-__all__ = ['resnetsn18', 'resnetsn34', 'resnetsn50', 'resnetsn101',
+__all__ = ['resnetsn18', 'resnetsn34', 'resnetsn50', 'resnetsn101', 'resnetsn101_fbn',
            'resnetsn152']
 
 
@@ -86,11 +86,12 @@ class Bottleneck(nn.Module):
 
 class ResNet(nn.Module):
 
-    def __init__(self, block, layers, feature_dim, spatial_size=224):
+    def __init__(self, block, layers, feature_dim, feat_bn=False, spatial_size=224):
         fc_map = {224: 12544, 112: 4096}
         self.inplanes = 64
         super(ResNet, self).__init__()
         self.feature_dim = feature_dim
+        self.feat_bn = feat_bn
 
         self.conv1 = nn.Conv2d(3, 64, kernel_size=7, stride=2, padding=3,
                                bias=False)
@@ -109,11 +110,18 @@ class ResNet(nn.Module):
         self.drop1 = nn.Dropout(0.5)
         self.feature = nn.Linear(fc_map[spatial_size], feature_dim)
         self.drop2 = nn.Dropout(0.5)
+        if feat_bn:
+            self.bn_feat = nn.BatchNorm1d(feature_dim, affine=False, eps=2e-5, momentum=0.9)
 
         for m in self.modules():
             if isinstance(m, nn.Conv2d):
                 n = m.kernel_size[0] * m.kernel_size[1] * m.out_channels
                 m.weight.data.normal_(0, math.sqrt(2. / n))
+            elif isinstance(m, nn.Linear):
+                scale = math.sqrt(3. / m.in_features)
+                m.weight.data.uniform_(-scale, scale)
+                if m.bias is not None:
+                    m.bias.data.zero_()
             elif isinstance(m, SwitchNorm2d):
                 m.weight.data.fill_(1)
                 m.bias.data.zero_()
@@ -151,6 +159,8 @@ class ResNet(nn.Module):
         x = x.view(x.size(0), -1)
         x = self.feature(x)
         x = self.drop2(x)
+        if self.feat_bn:
+            x = self.bn_feat(x)
 
         return x
 
@@ -174,6 +184,9 @@ def resnetsn101(**kwargs):
     model = ResNet(Bottleneck, [3, 4, 23, 3], **kwargs)
     return model
 
+def resnetsn101_fbn(**kwargs):
+    model = ResNet(Bottleneck, [3, 4, 23, 3], feat_bn=True, **kwargs)
+    return model
 
 def resnetsn152(**kwargs):
     model = ResNet(Bottleneck, [3, 8, 36, 3], **kwargs)

@@ -4,23 +4,23 @@ memcached: True
 memcached_client: "/mnt/lustre/share/memcached_client"
 
 model:
-    backbone: 'resnetsn50'
+    backbone: 'resnetsn101_fbn'
     feature_dim: 256
-    arc_fc: False
+    arc_fc: True
 
 transform:
     crop_size: 112
-    final_size: 224
+    final_size: 112
     crop_center_y_offset: 15
 
 train:
     rand_seed: 0
-    batch_size: [64]
+    batch_size: [192]
     loss_weight: [1.0]
-    base_lr: 0.3
+    base_lr: 0.5
     lr_decay_scale: 0.1
-    lr_decay_steps: [6, 9]
-    max_epoch: 11
+    lr_decay_steps: [10, 15]
+    max_epoch: 17
     momentum: 0.9
     weight_decay: 0.0001
     print_freq: 20
@@ -45,7 +45,7 @@ val:
 
 test:
     flag: True
-    initial_test: True
-    interval: 1
+    initial_test: False
+    interval: 2
     benchmark: ijba
-    batch_size: 128
+    batch_size: 256
