@@ -9,4 +9,5 @@ event*
 *.bin
 data
 old
+*hide
 .ipynb_checkpoints*
