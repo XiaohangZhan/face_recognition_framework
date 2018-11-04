@@ -218,23 +218,30 @@ def train(train_loader, model, optimizer, epoch, loss_weight, tb_logger, count):
         slice_pt = 0
         slice_idx = [0]
         for l in [p.size(0) for p in input]:
-            slice_pt += l
+            slice_pt += l // args.ngpu
             slice_idx.append(slice_pt)
 
-        input = torch.cat(tuple(input), dim=0)
+        organized_input = []
+        organized_target = []
+        for ng in range(args.ngpu):
+            for t in range(len(input)):
+                bs = args.train.batch_size[t] // args.ngpu
+                organized_input.append(input[t][ng * bs : (ng + 1) * bs, ...])
+                organized_target.append(target[t][ng * bs : (ng + 1) * bs, ...])
+        input = torch.cat(organized_input, dim=0)
+        target = torch.cat(organized_target, dim=0)
 
         # measure data loading time
         data_time.update(time.time() - end)
 
-        target = [tg.cuda(async=True) for tg in target]
         input_var = torch.autograd.Variable(input.cuda())
-        target_var = [torch.autograd.Variable(tg) for tg in target]
+        target_var = torch.autograd.Variable(target.cuda(async=True))
 
         # measure accuracy and record loss
         loss = model(input_var, target_var, slice_idx)
 
         for k in range(num_tasks):
-            losses[k].update(loss[k].data[0])
+            losses[k].update(loss[k].mean().data[0])
 
         # compute gradient and do SGD step
         optimizer.zero_grad()
@@ -272,6 +279,7 @@ def train(train_loader, model, optimizer, epoch, loss_weight, tb_logger, count):
         count[0] += 1
 
 def validate(val_loader, model, criterion, epoch, loss_weight, train_len, tb_logger, count):
+    raise NotImplemented
     num_tasks = len(val_loader)
     losses = [AverageMeter(args.val.average_stats) for k in range(num_tasks)]
 
@@ -334,7 +342,7 @@ def extract(ext_loader, model, output_file, total_size):
     log("Extracting Done. Total time: {}".format(time.time() - start))
 
 def evaluation(test_loader, model, num, outfeat_fn, benchmark):
-    batch_time = AverageMeter(9999999)
+    batcH_Time = AverageMeter(9999999)
     data_time = AverageMeter(9999999)
     model.eval()
     features = []
