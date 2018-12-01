@@ -11,3 +11,5 @@ data
 old
 *hide
 .ipynb_checkpoints*
+tensorboard_env.sh
+source.sh

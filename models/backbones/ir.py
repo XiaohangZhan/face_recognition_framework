@@ -209,11 +209,12 @@ class Block8(nn.Module):
 
 class InceptionResNetV2(nn.Module):
 
-    def __init__(self, avgpool, feature_dim):
+    def __init__(self, avgpool, feature_dim, spatial_size=224):
         super(InceptionResNetV2, self).__init__()
         # Special attributs
         self.feature_dim = feature_dim
         self.use_avgpool = avgpool
+        spatial_map = {224: 5, 112: 2}
         # Modules
         self.conv2d_1a = BasicConv2d(3, 32, kernel_size=3, stride=2)
         self.conv2d_2a = BasicConv2d(32, 32, kernel_size=3, stride=1)
@@ -280,7 +281,7 @@ class InceptionResNetV2(nn.Module):
         else:
             self.layer1x1 = BasicConv2d(1536, 256, kernel_size=1, stride=1)
             self.drop1 = nn.Dropout(0.5)
-            self.feature = nn.Linear(9216, feature_dim)
+            self.feature = nn.Linear(256 * spatial_map[spatial_size] * spatial_map[spatial_size], feature_dim)
         self.drop2 = nn.Dropout(0.5)
 
         for m in self.modules():

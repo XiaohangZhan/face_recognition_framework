@@ -40,6 +40,10 @@ class FaceDataset(Dataset):
                 self.lists = test.megaface.build_testset()
             elif config.test.benchmark == "ijba":
                 self.lists = test.ijba.build_testset()
+            elif config.test.benchmark == 'lfw':
+                self.lists = test.lfw.build_testset()
+            else:
+                raise Exception("No such benchmark: {}".format(config.test.benchmark))
             self.num_img = len(self.lists)
             self.metas = None
 

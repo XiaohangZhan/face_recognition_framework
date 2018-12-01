@@ -27,7 +27,6 @@ class ArcFullyConnected(Module):
         self.is_hard = is_hard
         assert s > 0
         assert 0 <= m < 0.5* math.pi
-        print(s, m, is_pw, is_hard)
         self.weight = Parameter(torch.Tensor(out_features, in_features))
         self.reset_parameters()
 

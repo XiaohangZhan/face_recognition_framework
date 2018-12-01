@@ -5,7 +5,7 @@ import torch.nn.functional as F
 import torch.utils.model_zoo as model_zoo
 from torch.autograd import Variable
 
-__all__ = ['NASNetALarge', 'NASNetASmall', 'nasnetalarge', 'nasnetasmall', 'nasnetasmallbn']
+__all__ = ['NASNetALarge', 'NASNetASmall', 'nasnetalarge', 'nasnetasmall']
 
 class MaxPoolPad(nn.Module):
 
@@ -466,10 +466,10 @@ class ReductionCell1(nn.Module):
 
 class NASNetASmall(nn.Module):
 
-    def __init__(self, feature_dim, setting=0):
+    def __init__(self, feature_dim, spatial_size=224):
         super(NASNetASmall, self).__init__()
         self.feature_dim = feature_dim
-        self.setting = setting
+        spatial_map = {224: 7, 112: 3}
 
         self.conv0 = nn.Sequential()
         self.conv0.add_module('conv', nn.Conv2d(in_channels=3, out_channels=96, kernel_size=3, padding=0, stride=2,
@@ -531,10 +531,8 @@ class NASNetASmall(nn.Module):
             nn.BatchNorm2d(256),
             nn.ReLU(inplace=False))
         self.drop1 = nn.Dropout(0.5)
-        self.face_feature = nn.Linear(12544, self.feature_dim)
+        self.face_feature = nn.Linear(256 * spatial_map[spatial_size] * spatial_map[spatial_size], self.feature_dim)
         #self.face_feature = nn.Linear(2304, self.feature_dim)
-        if setting == 2:
-            self.feat_bn = nn.BatchNorm2d(feature_dim, affine=False)
         self.drop2 = nn.Dropout(0.5)
 
         for m in self.modules():
@@ -587,8 +585,6 @@ class NASNetASmall(nn.Module):
         x = self.drop1(x)
         x = x.view(x.size(0), -1)
         x = self.face_feature(x)
-        if self.setting == 2:
-            x = self.feat_bn(x)
         x = self.drop2(x)
 
         return x
@@ -715,6 +711,8 @@ class NASNetASmall2(nn.Module):
         x = self.drop2(x)
 
         return x
+
+
 class NASNetALarge(nn.Module):
 
     def __init__(self, feature_dim):
@@ -843,10 +841,6 @@ def nasnetalarge(**kwargs):
 
 def nasnetasmall(feature_dim, **kwargs):
     model = NASNetASmall(feature_dim, **kwargs)
-    return model
-
-def nasnetasmallbn(feature_dim, **kwargs):
-    model = NASNetASmall(feature_dim, setting=2, **kwargs)
     return model
 
 if __name__ == "__main__":

@@ -20,7 +20,7 @@ from tensorboardX import SummaryWriter
 
 import models
 from datasets import FaceDataset, GivenSizeSampler
-from utils.common_utils import AverageMeter, load_state, save_state, log
+from utils import AverageMeter, load_state, save_state, log
 import test
 
 model_names = sorted(name for name in models.backbones.__dict__
@@ -118,7 +118,7 @@ def main():
     log("Creating model on [{}] gpus: {}".format(args.ngpu, args.gpus))
     if args.evaluate:
         args.num_classes = None
-    model = models.ArcMultiTaskWithLoss(backbone=args.model.backbone, num_classes=args.num_classes, feature_dim=args.model.feature_dim, spatial_size=args.transform.final_size, arc_fc=args.model.arc_fc)
+    model = models.MultiTaskWithLoss(backbone=args.model.backbone, num_classes=args.num_classes, feature_dim=args.model.feature_dim, spatial_size=args.transform.final_size, arc_fc=args.model.arc_fc, feat_bn=args.model.feat_bn)
     os.environ["CUDA_VISIBLE_DEVICES"] = args.gpus
     model = nn.DataParallel(model)
     model.cuda()
@@ -307,7 +307,7 @@ def validate(val_loader, model, criterion, epoch, loss_weight, train_len, tb_log
     for k in range(num_tasks):
         tb_logger.add_scalar('val_loss_{}'.format(k), losses[k].val, count[0])
 
-def extract(ext_loader, model, output_file, total_size):
+def extract(ext_loader, model, num, output_file):
     batch_time = AverageMeter(9999999)
     data_time = AverageMeter(9999999)
     model.eval()
@@ -329,34 +329,18 @@ def extract(ext_loader, model, output_file, total_size):
                     "Data {data_time.val:.3f} ({data_time.avg:.3f})".format(
                     i, len(ext_loader), batch_time=batch_time, data_time=data_time))
 
-    features = np.concatenate(features, axis=0)
-    features[:total_size,...].tofile(output_file)
+    features = np.concatenate(features, axis=0)[:num, :]
+    features.tofile(output_file)
     log("Extracting Done. Total time: {}".format(time.time() - start))
+    return features
 
 def evaluation(test_loader, model, num, outfeat_fn, benchmark):
-    batch_time = AverageMeter(9999999)
-    data_time = AverageMeter(9999999)
-    model.eval()
-    features = []
-    
-    start = time.time()
-    end = time.time()
-    for i, (input, _) in enumerate(test_loader):
-        data_time.update(time.time() - end)
-        input_var = torch.autograd.Variable(input.cuda(), volatile=True)
-        output = model(input_var, extract_mode=True)
-        features.append(output.data.cpu().numpy())
-        batch_time.update(time.time() - end)
-        end = time.time()
-    
-        if i % args.train.print_freq == 0:
-            log("Extracting: {0}/{1}\t"
-                    "Time {batch_time.val:.3f} ({batch_time.avg:.3f})\t"
-                    "Data {data_time.val:.3f} ({data_time.avg:.3f})".format(
-                    i, len(test_loader), batch_time=batch_time, data_time=data_time))
-    features = np.concatenate(features, axis=0)[:num, :]
-    features.tofile(outfeat_fn)
-    log("Extracting Done. Total time: {}".format(time.time() - start))
+    load_feat = False
+    if not os.path.isfile(outfeat_fn) or not load_feat:
+        features = extract(test_loader, model, num, outfeat_fn)
+    else:
+        log("Loading features: {}".format(outfeat_fn))
+        features = np.fromfile(outfeat_fn, dtype=np.float32).reshape(-1, args.model.feature_dim)
 
     if benchmark == "megaface":
         r = test.test_megaface(features)
@@ -367,9 +351,15 @@ def evaluation(test_loader, model, num, outfeat_fn, benchmark):
     elif benchmark == "ijba":
         r = test.test_ijba(features)
         log(' * IJB-A: {} [{}], {} [{}], {} [{}]'.format(r[0][0], r[0][1], r[1][0], r[1][1], r[2][0], r[2][1]))
-        with open(outfeat_fn[:-4] + "_ijba.txt", 'w') as f:
+        with open(outfeat_fn[:-4] + ".txt", 'w') as f:
             f.write(' * IJB-A: {} [{}], {} [{}], {} [{}]'.format(r[0][0], r[0][1], r[1][0], r[1][1], r[2][0], r[2][1]))
         return r[2][1]
+    elif benchmark == "lfw":
+        r = test.test_lfw(features)
+        log(' * LFW: mean: {} std: {}'.format(r[0], r[1]))
+        with open(outfeat_fn[:-4] + ".txt", 'w') as f:
+            f.write(' * LFW: mean: {} std: {}'.format(r[0], r[1]))
+        return r[0]
 
 
 if __name__ == '__main__':

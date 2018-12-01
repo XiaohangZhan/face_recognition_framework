@@ -1,8 +1,6 @@
 import numpy as np
-import shutil
 import torch
 import logging
-import torch.distributed as dist
 import os
 
 class AverageMeter(object):
@@ -45,7 +43,7 @@ def save_state(state, path, epoch, is_last=False):
         os.makedirs(os.path.dirname(path))
     torch.save(state, '{}_{}.pth.tar'.format(path, epoch))
     if is_last:
-        os.system('ln -s {}_{}.pth.tar {}_last.pth.tar'.format(path, epoch, path))
+        os.system('cp {}_{}.pth.tar {}_last.pth.tar'.format(path, epoch, path))
 
 def load_state(path, model, optimizer=None):
     if os.path.isfile(path):

@@ -7,67 +7,27 @@ from collections import OrderedDict
 __all__ = ['DenseNet', 'densenet121', 'densenet169', 'densenet201', 'densenet161']
 
 
-model_urls = {
-    'densenet121': 'https://download.pytorch.org/models/densenet121-a639ec97.pth',
-    'densenet169': 'https://download.pytorch.org/models/densenet169-b2777c0a.pth',
-    'densenet201': 'https://download.pytorch.org/models/densenet201-c1103571.pth',
-    'densenet161': 'https://download.pytorch.org/models/densenet161-8d451a50.pth',
-}
-
-
 def densenet121(pretrained=False, **kwargs):
-    r"""Densenet-121 model from
-    `"Densely Connected Convolutional Networks" <https://arxiv.org/pdf/1608.06993.pdf>`_
-
-    Args:
-        pretrained (bool): If True, returns a model pre-trained on ImageNet
-    """
     model = DenseNet(num_init_features=64, growth_rate=32, block_config=(6, 12, 24, 16),
                      **kwargs)
-    if pretrained:
-        model.load_state_dict(model_zoo.load_url(model_urls['densenet121']))
     return model
 
 
 def densenet169(pretrained=False, **kwargs):
-    r"""Densenet-169 model from
-    `"Densely Connected Convolutional Networks" <https://arxiv.org/pdf/1608.06993.pdf>`_
-
-    Args:
-        pretrained (bool): If True, returns a model pre-trained on ImageNet
-    """
     model = DenseNet(num_init_features=64, growth_rate=32, block_config=(6, 12, 32, 32),
                      **kwargs)
-    if pretrained:
-        model.load_state_dict(model_zoo.load_url(model_urls['densenet169']))
     return model
 
 
 def densenet201(pretrained=False, **kwargs):
-    r"""Densenet-201 model from
-    `"Densely Connected Convolutional Networks" <https://arxiv.org/pdf/1608.06993.pdf>`_
-
-    Args:
-        pretrained (bool): If True, returns a model pre-trained on ImageNet
-    """
     model = DenseNet(num_init_features=64, growth_rate=32, block_config=(6, 12, 48, 32),
                      **kwargs)
-    if pretrained:
-        model.load_state_dict(model_zoo.load_url(model_urls['densenet201']))
     return model
 
 
 def densenet161(pretrained=False, **kwargs):
-    r"""Densenet-161 model from
-    `"Densely Connected Convolutional Networks" <https://arxiv.org/pdf/1608.06993.pdf>`_
-
-    Args:
-        pretrained (bool): If True, returns a model pre-trained on ImageNet
-    """
     model = DenseNet(num_init_features=96, growth_rate=48, block_config=(6, 12, 36, 24),
                      **kwargs)
-    if pretrained:
-        model.load_state_dict(model_zoo.load_url(model_urls['densenet161']))
     return model
 
 
@@ -123,8 +83,8 @@ class DenseNet(nn.Module):
         num_classes (int) - number of classification classes
     """
     def __init__(self, growth_rate=32, block_config=(6, 12, 24, 16),
-                 num_init_features=64, bn_size=4, drop_rate=0, feature_dim=256):
-
+                 num_init_features=64, bn_size=4, drop_rate=0, feature_dim=256, spatial_size=224):
+        spatial_map = {224: 7, 112: 3}
         super(DenseNet, self).__init__()
 
         self.feature_dim = feature_dim
@@ -153,7 +113,7 @@ class DenseNet(nn.Module):
         self.features.add_module('norm5', nn.BatchNorm2d(num_features))
 
         # face
-        self.face_feature = nn.Linear(num_features * 7 * 7, feature_dim)
+        self.face_feature = nn.Linear(num_features * spatial_map[spatial_size] * spatial_map[spatial_size], feature_dim)
         self.drop1 = nn.Dropout(0.5)
 
         # Official init from torch repo.
@@ -170,7 +130,6 @@ class DenseNet(nn.Module):
         features = self.features(x)
         out = F.relu(features, inplace=True)
         out = out.view(out.size(0), -1)
-        #out = F.avg_pool2d(out, kernel_size=7, stride=1).view(features.size(0), -1)
         out = self.face_feature(out)
         out = self.drop1(out)
         

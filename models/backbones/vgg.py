@@ -23,18 +23,19 @@ model_urls = {
 
 class VGG(nn.Module):
 
-    def __init__(self, features, feature_dim):
+    def __init__(self, features, feature_dim, spatial_size=224):
         super(VGG, self).__init__()
         self.features = features
         self.feature_dim = feature_dim
+        spatial_map = {224: 7, 112: 3}
         self.face_features = nn.Sequential(
-            nn.Linear(512 * 7 * 7, 2048),
+            nn.Linear(512 * spatial_map[spatial_size] * spatial_map[spatial_size], 2048),
             nn.ReLU(inplace=False),
             nn.Dropout(0.5),
             nn.Linear(2048, feature_dim),
             nn.Dropout(0.5))
 
-        #self._initialize_weights()
+        self._initialize_weights()
 
     def forward(self, x):
         x = self.features(x)
