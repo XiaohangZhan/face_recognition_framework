@@ -26,7 +26,9 @@ class MultiTaskWithLoss(nn.Module):
         if extract_mode:
             return feature
         else:
+            assert feature.size(0) == target.size(0)
             assert(len(slice_idx) == self.num_tasks + 1)
+            assert slice_idx[-1] == feature.size(0), "{} vs {}".format(slice_idx[-1], feature.size(0))
             if not self.arc_fc:
                 x = [self.fcs[k](feature[slice_idx[k]:slice_idx[k+1], ...]) for k in range(self.num_tasks)]
             else:

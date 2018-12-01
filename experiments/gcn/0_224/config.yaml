@@ -1,13 +1,12 @@
 workers: 16
 gpus: '0,1,2,3,4,5,6,7' # split using ","
 memcached: True
-memcached_client: "/mnt/lustre/share/memcached_client"
+memcached_client: "/mnt/lustrenew/share/memcached_client"
 
 model:
-    backbone: 'resnet101'
+    backbone: 'resnet50'
     feature_dim: 256
     arc_fc: False
-    feat_bn: False
 
 transform:
     crop_size: 112
@@ -16,26 +15,26 @@ transform:
 
 train:
     rand_seed: 0
-    batch_size: [48]
+    batch_size: [64]
     loss_weight: [1.0]
-    base_lr: 0.1
+    base_lr: 0.3
     lr_decay_scale: 0.1
-    lr_decay_steps: [12, 18]
-    max_epoch: 21
+    lr_decay_steps: [40, 60]
+    max_epoch: 70
     momentum: 0.9
     weight_decay: 0.0001
-    print_freq: 20
+    print_freq: 100
     average_stats: 100
     augmentation:
         flip_aug: False
-        scale_aug: 0.04
-        trans_aug: 0.02
+        scale_aug: 0.02
+        trans_aug: 0.01
     data_root:
-        - '/mnt/lustre/zhouyucong/verify/datasets/emore/aligned'
+        - '/mnt/lustrenvme/share/yanglei/emore'
     data_list:
-        - 'data/emore_split112/0_list.txt'
+        - '/mnt/lustrenvme/share/yanglei/0_gt/list.txt'
     data_meta:
-        - 'data/emore_split112/0_meta.txt'
+        - '/mnt/lustrenvme/share/yanglei/0_gt/meta.txt'
 
 val:
     flag: False
@@ -46,7 +45,7 @@ val:
 
 test:
     flag: True
-    initial_test: True
-    interval: 1
-    benchmark: lfw
+    initial_test: False
+    interval: 5
+    benchmark: megaface
     batch_size: 128

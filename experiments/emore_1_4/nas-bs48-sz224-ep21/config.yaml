@@ -48,5 +48,5 @@ test:
     flag: True
     initial_test: True
     interval: 1
-    benchmark: ijba
+    benchmark: lfw
     batch_size: 128
