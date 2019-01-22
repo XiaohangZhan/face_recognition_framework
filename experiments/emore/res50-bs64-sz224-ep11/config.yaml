@@ -1,7 +1,7 @@
 workers: 16
 gpus: '0,1,2,3,4,5,6,7' # split using ","
-memcached: True
-memcached_client: "/mnt/lustre/share/memcached_client"
+memcached: False
+memcached_client: ""
 
 model:
     backbone: 'resnet50'
@@ -30,7 +30,7 @@ train:
         scale_aug: 0.04
         trans_aug: 0.02
     data_root:
-        - '/mnt/lustre/zhouyucong/verify/datasets/emore/aligned'
+        - 'data/emore/images'
     data_list:
         - 'data/emore/list.txt'
     data_meta:
