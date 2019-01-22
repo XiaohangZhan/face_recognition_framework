@@ -32,20 +32,20 @@ Online testing and visualization with Tensorboard.
 
 ### Setup step by step
 
-#### Clone the project.
+1. Clone the project.
 ```
 git clone git@github.com:XiaohangZhan/face_recognition_framework.git
 cd face_recognition_framework
 ```
 
-#### Dependency.
+2. Dependency.
 python>=3.6, tensorboardX, pytorch>=0.3.1
 
-#### Data Preparation.
+3. Data Preparation.
 
-##### training data.
+* training data.
 
-##### testing data.
+* testing data.
 
 4. Configure your experiments.
 
