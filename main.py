@@ -106,17 +106,28 @@ def main():
                 num_workers=args.workers, pin_memory=False, sampler=val_sampler[k]) for k in range(num_tasks)]
             assert(all([len(val_loader[k]) == len(val_loader[0]) for k in range(num_tasks)]))
 
-    if args.test.flag or args.evaluate:
+    if args.test.flag or args.evaluate: # online or offline evaluate
         args.test.batch_size *= args.ngpu
         test_dataset = FaceDataset(args, 0, 'test')
-        test_sampler = GivenSizeSampler(test_dataset, total_size=int(np.ceil(len(test_dataset) / float(args.test.batch_size)) * args.test.batch_size), sequential=True)
+        test_sampler = GivenSizeSampler(
+            test_dataset, total_size=int(np.ceil(len(test_dataset) / float(args.test.batch_size)) * args.test.batch_size), sequential=True)
         test_loader = DataLoader(
             test_dataset, batch_size=args.test.batch_size, shuffle=False,
             num_workers=args.workers, pin_memory=False, sampler=test_sampler)
 
+    if args.extract: # feature extraction
+        args.extract_info.batch_size *= args.ngpu
+        extract_dataset = FaceDataset(args, 0, 'extract')
+        extract_sampler = GivenSizeSampler(
+            extract_dataset, total_size=int(np.ceil(len(extract_dataset) / float(args.extract_info.batch_size)) * args.extract_info.batch_size), sequential=True)
+        extract_loader = DataLoader(
+            extract_dataset, batch_size=args.extract_info.batch_size, shuffle=False,
+            num_workers=args.workers, pin_memory=False, sampler=extract_sampler)
+
+
     ## create model
     log("Creating model on [{}] gpus: {}".format(args.ngpu, args.gpus))
-    if args.evaluate:
+    if args.evaluate or args.extract:
         args.num_classes = None
     model = models.MultiTaskWithLoss(backbone=args.model.backbone, num_classes=args.num_classes, feature_dim=args.model.feature_dim, spatial_size=args.transform.final_size, arc_fc=args.model.arc_fc, feat_bn=args.model.feat_bn)
     os.environ["CUDA_VISIBLE_DEVICES"] = args.gpus
@@ -146,6 +157,10 @@ def main():
         evaluation(test_loader, model, num=len(test_dataset), outfeat_fn="{}_{}.bin".format(args.load_path[:-8], args.test.benchmark), benchmark=args.test.benchmark)
         return
 
+    ## feature extraction
+    if args.extract:
+        extract(extract_loader, model, num=len(extract_dataset), output_file="{}_{}.bin".format(args.load_path[:-8], args.extract_info.data_name))
+        return
 
     ######################## train #################
     ## lr scheduler

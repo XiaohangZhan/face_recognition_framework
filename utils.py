@@ -42,8 +42,8 @@ def save_state(state, path, epoch, is_last=False):
     if not os.path.isdir(os.path.dirname(path)):
         os.makedirs(os.path.dirname(path))
     torch.save(state, '{}_{}.pth.tar'.format(path, epoch))
-    if is_last:
-        os.system('cp {}_{}.pth.tar {}_last.pth.tar'.format(path, epoch, path))
+    #if is_last:
+        #os.system('cp {}_{}.pth.tar {}_last.pth.tar'.format(path, epoch, path))
 
 def load_state(path, model, optimizer=None):
     if os.path.isfile(path):

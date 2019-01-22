@@ -50,3 +50,9 @@ test:
     interval: 1
     benchmark: lfw
     batch_size: 128
+
+extract_info:
+    batch_size: 128
+    data_name: emore41
+    data_root: "/mnt/lustre/zhouyucong/verify/datasets/emore/aligned"
+    data_list: "data/emore_split112/1_list.txt"

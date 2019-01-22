@@ -19,7 +19,7 @@ class FaceDataset(Dataset):
     def __init__(self, config, task_idx, phase):
         self.root_dir = config.train.data_root[task_idx]
         self.config = config
-        assert phase in ['train', 'val', 'test']
+        assert phase in ['train', 'val', 'test', 'extract']
         self.phase = phase
         
         if phase in ['train', 'val']:
@@ -35,7 +35,7 @@ class FaceDataset(Dataset):
             assert self.num_img == len(self.lists)
             assert self.num_img == len(self.metas)
             assert self.num_class > max(self.metas)
-        else: # test
+        elif phase == "test": # test
             if config.test.benchmark == "megaface":
                 self.lists = test.megaface.build_testset()
             elif config.test.benchmark == "ijba":
@@ -44,6 +44,12 @@ class FaceDataset(Dataset):
                 self.lists = test.lfw.build_testset()
             else:
                 raise Exception("No such benchmark: {}".format(config.test.benchmark))
+            self.num_img = len(self.lists)
+            self.metas = None
+        else: # extract
+            with open(config.extract_info.data_list, 'r') as f:
+                lines = f.readlines()
+                self.lists = [os.path.join(config.extract_info.data_root, l.strip()) for l in lines]
             self.num_img = len(self.lists)
             self.metas = None
 
@@ -83,7 +89,7 @@ class FaceDataset(Dataset):
     def __getitem__(self, idx):
         self.__init_memcached()
         ## memcached
-        if self.config.memcached and self.phase != "test":
+        if self.config.memcached:
             img, label = self._read_one(idx)
         else:
             filename = self.lists[idx]
