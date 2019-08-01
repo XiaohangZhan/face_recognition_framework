@@ -34,47 +34,48 @@ Online testing and visualization with Tensorboard.
 
 1. Clone the project.
 
-  ```
-  git clone git@github.com:XiaohangZhan/face_recognition_framework.git
-  cd face_recognition_framework
-  ```
+      ```
+      git clone git@github.com:XiaohangZhan/face_recognition_framework.git
+      cd face_recognition_framework
+      ```
 
 2. Dependency.
-python>=3.6, tensorboardX, pytorch>=0.3.1
+
+    python>=3.6, tensorboardX, pytorch>=0.3.1
 
 3. Data Preparation.
 
-      Download datasets from [insightface](https://github.com/deepinsight/insightface/wiki/Dataset-Zoo)into your data storage folder, e.g., `~/data/face_recognition/`. Taking CASIA-Webface for example:
+      Download datasets from [insightface](https://github.com/deepinsight/insightface/wiki/Dataset-Zoo) into your data storage folder, e.g., `~/data/face_recognition/`. Taking CASIA-Webface for example:
 
-  ```sh
-  cd ~/data/face_recognition/
-  unzip faces_CASIA_112x112.zip
-  cd - # back to the repo root
-  mkdir -p data/testsets
-  cp ~/data/face_recognition/faces_webface_112x112/*.bin data/testsets/
-  python tools/convert_data.py -r ~/data/face_recognition/faces_webface_112x112 -o ~/data/face_recognition/faces_webface_112x112 # convert mxnet records into images
-  ln -s ~/data/face_recognition/faces_webface_112x112 data/webface
-  ```
+      ```sh
+      cd ~/data/face_recognition/
+      unzip faces_CASIA_112x112.zip
+      cd - # back to the repo root
+      mkdir -p data/testsets
+      cp ~/data/face_recognition/faces_webface_112x112/*.bin data/testsets/
+      python tools/convert_data.py -r ~/data/face_recognition/faces_webface_112x112 -o ~/data/face_recognition/faces_webface_112x112 # convert mxnet records into images
+      ln -s ~/data/face_recognition/faces_webface_112x112 data/webface
+      ```
 
 4. Training.
 
-  ```
-  sh experiments/webface/res50arc-bs64-sz224-ep35/train.sh
-  ```
+      ```
+      sh experiments/webface/res50arc-bs64-sz224-ep35/train.sh
+      ```
 
 5. Evalution.
 
-  ```
-  sh experiments/webface/res50arc-bs64-sz224-ep35/evaluation.sh
-  ```
+      ```
+      sh experiments/webface/res50arc-bs64-sz224-ep35/evaluation.sh
+      ```
 
 6. Feature extraction.
 
-Firstly, specify the `data_root` and `data_list` under `extract_info` in the config file. Then execute:
+      Firstly, specify the `data_root` and `data_list` under `extract_info` in the config file. Then execute:
 
-  ```
-  sh experiments/webface/res50arc-bs64-sz224-ep35/extract.sh # feature file is stored in checkpoints/ckpt_epoch_*_*.bin
-  ```
+      ```
+      sh experiments/webface/res50arc-bs64-sz224-ep35/extract.sh # feature file is stored in checkpoints/ckpt_epoch_*_*.bin
+      ```
 
 ### Baselines
 
