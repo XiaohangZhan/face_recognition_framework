@@ -13,3 +13,5 @@ old
 .ipynb_checkpoints*
 tensorboard_env.sh
 source.sh
+TODO
+experiments/**/*rep

@@ -9,10 +9,7 @@ model:
     arc_fc: True
     feat_bn: True
 
-transform:
-    crop_size: 112
-    final_size: 224
-    crop_center_y_offset: 15
+    input_size: 224
 
 train:
     rand_seed: 0
@@ -20,8 +17,8 @@ train:
     loss_weight: [1.0]
     base_lr: 0.3
     lr_decay_scale: 0.1
-    lr_decay_steps: [6, 9]
-    max_epoch: 11
+    lr_decay_steps: [20, 30]
+    max_epoch: 35
     momentum: 0.9
     weight_decay: 0.0001
     print_freq: 20
@@ -31,11 +28,9 @@ train:
         scale_aug: 0.04
         trans_aug: 0.02
     data_root:
-        - 'data/emore/images'
+        - 'data/webface/images'
     data_list:
-        - 'data/emore/list.txt'
-    data_meta:
-        - 'data/emore/meta.txt'
+        - 'data/webface/list.txt'
 
 val:
     flag: False
@@ -48,12 +43,12 @@ test:
     flag: True
     initial_test: True
     interval: 1
-    benchmark: ijba
+    benchmark: lfw
     batch_size: 128
     nfolds: 10
 
 extract_info:
-    data_root:
-        - 'data/emore/images'
-    data_list:
-        - 'data/emore/list.txt'
+    batch_size: 128
+    data_name: '' # used to name the feature file
+    data_root: ''
+    data_list: '' # image file name in each line
