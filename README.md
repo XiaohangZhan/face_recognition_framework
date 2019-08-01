@@ -43,22 +43,37 @@ python>=3.6, tensorboardX, pytorch>=0.3.1
 
 3. Data Preparation.
 
-* training data.
+Download datasets from [insightface](https://github.com/deepinsight/insightface/wiki/Dataset-Zoo)into your data storage folder, e.g., `~/data/face_recognition/`. Taking CASIA-Webface for example:
 
-* testing data.
+```sh
+cd ~/data/face_recognition/
+unzip faces_CASIA_112x112.zip
+cd - # back to the repo root
+mkdir -p data/testsets
+cp ~/data/face_recognition/faces_webface_112x112/*.bin data/testsets/
+python tools/convert_data.py -r ~/data/face_recognition/faces_webface_112x112 -o ~/data/face_recognition/faces_webface_112x112 # convert mxnet records into images
+ln -s ~/data/face_recognition/faces_webface_112x112 data/webface
+```
 
-4. Configure your experiments.
+4. Training.
 
-5. Training.
 ```
-sh experiments/emore/train.sh
+sh experiments/webface/res50arc-bs64-sz224-ep35/train.sh
 ```
-6. Evalution.
-```
-cat $exp/checkpoints/ckpt\_epoch\_$iter.txt
-```
-7. Feature extraction.
 
+5. Evalution.
+
+```
+sh experiments/webface/res50arc-bs64-sz224-ep35/evaluation.sh
+```
+
+6. Feature extraction.
+
+Firstly, specify the `data_root` and `data_list` under `extract_info` in the config file. Then execute:
+
+```
+sh experiments/webface/res50arc-bs64-sz224-ep35/extract.sh # feature file is stored in checkpoints/ckpt_epoch_*_*.bin
+```
 
 ### Baselines
 

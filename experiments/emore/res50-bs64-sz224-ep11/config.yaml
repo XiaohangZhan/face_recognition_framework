@@ -7,6 +7,7 @@ model:
     backbone: 'resnet50'
     feature_dim: 256
     arc_fc: False
+    feat_bn: False
 
 transform:
     crop_size: 112
@@ -49,3 +50,9 @@ test:
     interval: 1
     benchmark: ijba
     batch_size: 128
+
+extract_info:
+    data_root:
+        - 'data/emore/images'
+    data_list:
+        - 'data/emore/list.txt'

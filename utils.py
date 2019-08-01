@@ -1,7 +1,11 @@
 import numpy as np
 import torch
 import logging
+import io
 import os
+import sys
+import pickle
+from PIL import Image
 
 class AverageMeter(object):
     """Computes and stores the average and current value"""
@@ -60,3 +64,32 @@ def load_state(path, model, optimizer=None):
 def log(string):
     print(string)
     logging.info(string)
+
+
+def bin_loader(path):
+    '''load verification img array and label from bin file
+    '''
+    with open(path, 'rb') as f:
+        if sys.version_info[0] == 2:
+            data = pickle.load(open(path, 'rb'))
+        elif sys.version_info[0] == 3:
+            data = pickle.load(open(path, 'rb'), encoding='bytes')
+        else:
+            raise EnvironmentError('Only support python 2 or 3')
+    bins, lbs = data
+    assert len(bins) == 2*len(lbs)
+    imgs = [pil_loader(b) for b in bins]
+    return imgs, lbs
+
+def pil_loader(img_str):
+    buff = io.BytesIO(img_str)
+    with Image.open(buff) as img:
+        img = img.convert('RGB')
+        return img
+
+
+def normalize(feat, axis=1):
+    if axis == 0:
+        return feat / np.linalg.norm(feat, axis=0)
+    elif axis == 1:
+        return feat / np.linalg.norm(feat, axis=1)[:, np.newaxis]

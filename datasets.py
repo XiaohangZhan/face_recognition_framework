@@ -9,6 +9,10 @@ import test
 from PIL import Image
 import torchvision.transforms as transforms
 
+from utils import bin_loader
+
+import pdb
+
 def pil_loader(img_str):
     buff = io.BytesIO(img_str)
     with Image.open(buff) as img:
@@ -180,3 +184,140 @@ class GivenSizeSampler(Sampler):
     def set_epoch(self, epoch):
         self.epoch = epoch
 
+
+class BinDataset(Dataset):
+    def __init__(self, bin_file, transform=None):
+        self.img_lst, _ = bin_loader(bin_file)
+        self.num = len(self.img_lst)
+        self.transform = transform
+
+    def __len__(self):
+        return self.num
+
+    def _read(self, idx=None):
+        if idx == None:
+            idx = np.random.randint(self.num)
+        try:
+            img = self.img_lst[idx]
+            return img
+        except Exception as err:
+            print('Read image[{}] failed ({})'.format(idx, err))
+            return self._read()
+
+    def __getitem__(self, idx):
+        img = self._read(idx)
+        if self.transform is not None:
+            img = self.transform(img)
+        return img
+
+
+def build_labeled_dataset(filelist, prefix):
+    img_lst = []
+    lb_lst = []
+    with open(filelist) as f:
+        for x in f.readlines():
+            n, lb = x.strip().split(' ')
+            lb = int(lb)
+            img_lst.append(os.path.join(prefix, n))
+            lb_lst.append(lb)
+    assert len(img_lst) == len(lb_lst)
+    return img_lst, lb_lst
+
+def build_unlabeled_dataset(filelist, prefix):
+    img_lst = []
+    with open(filelist) as f:
+        for x in f.readlines():
+            img_lst.append(os.path.join(prefix, x.strip()))
+    return img_lst
+
+
+class FileListLabeledDataset(Dataset):
+    def __init__(self, filelist, prefix, transform=None, memcached=False, memcached_client=''):
+        self.img_lst, self.lb_lst = build_labeled_dataset(filelist, prefix)
+        self.num = len(self.img_lst)
+        self.transform = transform
+        self.num_class = max(self.lb_lst) + 1
+        self.initialized = False
+        self.memcached = memcached
+        self.memcached_client = memcached_client
+
+    def __len__(self):
+        return self.num
+
+    def __init_memcached(self):
+        if not self.initialized:
+            server_list_config_file = "{}/server_list.conf".format(self.memcached_client)
+            client_config_file = "{}/client.conf".format(self.memcached_client)
+            self.mclient = mc.MemcachedClient.GetInstance(server_list_config_file, client_config_file)
+            self.initialized = True
+
+    def _read(self, idx=None):
+        if idx is None:
+            idx = np.random.randint(self.num)
+        fn = self.img_lst[idx]
+        lb = self.lb_lst[idx]
+        try:
+            if self.memcached:
+                value = mc.pyvector()
+                self.mclient.Get(fn, value)
+                value_str = mc.ConvertBuffer(value)
+                img = pil_loader(value_str)
+            else:
+                img = pil_loader(open(fn, 'rb').read())
+            return img, lb
+        except Exception as err:
+            print('Read image[{}, {}] failed ({})'.format(idx, fn, err))
+            return self._read()
+
+    def __getitem__(self, idx):
+        if self.memcached:
+            self.__init_memcached()
+        img, lb = self._read(idx)
+        if self.transform is not None:
+            img = self.transform(img)
+        return img, lb
+
+class FileListDataset(Dataset):
+    def __init__(self, filelist, prefix, transform=None, memcached=False, memcached_client=''):
+        self.img_lst = build_unlabeled_dataset(filelist, prefix)
+        self.num = len(self.img_lst)
+        self.transform = transform
+        self.initialized = False
+        self.memcached = memcached
+        self.memcached_client = memcached_client
+
+    def __len__(self):
+        return self.num
+
+    def __init_memcached(self):
+        if not self.initialized:
+            server_list_config_file = "{}/server_list.conf".format(self.memcached_client)
+            client_config_file = "{}/client.conf".format(self.memcached_client)
+            self.mclient = mc.MemcachedClient.GetInstance(server_list_config_file, client_config_file)
+            self.initialized = True
+
+    def _read(self, idx=None):
+        if idx is None:
+            idx = np.random.randint(self.num)
+        fn = self.img_lst[idx]
+        try:
+            #img = pil_loader(open(fn, 'rb').read())
+            if self.memcached:
+                value = mc.pyvector()
+                self.mclient.Get(fn, value)
+                value_str = mc.ConvertBuffer(value)
+                img = pil_loader(value_str)
+            else:
+                img = pil_loader(open(fn, 'rb').read())
+            return img
+        except Exception as err:
+            print('Read image[{}, {}] failed ({})'.format(idx, fn, err))
+            return self._read()
+
+    def __getitem__(self, idx):
+        if self.memcached:
+            self.__init_memcached()
+        img = self._read(idx)
+        if self.transform is not None:
+            img = self.transform(img)
+        return img

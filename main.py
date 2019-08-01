@@ -16,12 +16,14 @@ import torch.nn as nn
 import torch.backends.cudnn as cudnn
 import torch.optim
 from torch.utils.data import DataLoader
+import torchvision.transforms as transforms
 from tensorboardX import SummaryWriter
 
 import models
-from datasets import FaceDataset, GivenSizeSampler
-from utils import AverageMeter, load_state, save_state, log
+from datasets import GivenSizeSampler, BinDataset, FileListLabeledDataset, FileListDataset
+from utils import AverageMeter, load_state, save_state, log, normalize, bin_loader
 import test
+from evaluation import evaluate
 
 model_names = sorted(name for name in models.backbones.__dict__
     if name.islower() and not name.startswith("__")
@@ -63,12 +65,12 @@ def main():
     assert(num_tasks == len(args.train.loss_weight))
     assert(num_tasks == len(args.train.batch_size))
     assert(num_tasks == len(args.train.data_list))
-    assert(num_tasks == len(args.train.data_meta))
+    #assert(num_tasks == len(args.train.data_meta))
     if args.val.flag:
         assert(num_tasks == len(args.val.batch_size))
         assert(num_tasks == len(args.val.data_root))
         assert(num_tasks == len(args.val.data_list))
-        assert(num_tasks == len(args.val.data_meta))
+        #assert(num_tasks == len(args.val.data_meta))
 
     ## mkdir
     if not hasattr(args, 'save_path'):
@@ -85,7 +87,16 @@ def main():
         for i in range(num_tasks):
             args.train.batch_size[i] *= args.ngpu
 
-        train_dataset = [FaceDataset(args, idx, 'train') for idx in range(num_tasks)]
+        #train_dataset = [FaceDataset(args, idx, 'train') for idx in range(num_tasks)]
+        train_dataset = [FileListLabeledDataset(
+            args.train.data_list[i], args.train.data_root[i],
+            transforms.Compose([
+                transforms.RandomHorizontalFlip(),
+                transforms.Resize(args.model.input_size),
+                transforms.ToTensor(),
+                transforms.Normalize([0.5, 0.5, 0.5], [0.5, 0.5, 0.5]),]),
+            memcached=args.memcached,
+            memcached_client=args.memcached_client) for i in range(num_tasks)]
         args.num_classes = [td.num_class for td in train_dataset]
         train_longest_size = max([int(np.ceil(len(td) / float(bs))) for td, bs in zip(train_dataset, args.train.batch_size)])
         train_sampler = [GivenSizeSampler(td, total_size=train_longest_size * bs, rand_seed=args.train.rand_seed) for td, bs in zip(train_dataset, args.train.batch_size)]
@@ -98,7 +109,16 @@ def main():
             for i in range(num_tasks):
                 args.val.batch_size[i] *= args.ngpu
     
-            val_dataset = [FaceDataset(args, idx, 'val') for idx in range(num_tasks)]
+            #val_dataset = [FaceDataset(args, idx, 'val') for idx in range(num_tasks)]
+            val_dataset = [FileListLabeledDataset(
+                args.val.data_list[i], args.val.data_root[i],
+                transforms.Compose([
+                    transforms.Resize(args.model.input_size),
+                    transforms.ToTensor(),
+                    transforms.Normalize([0.5, 0.5, 0.5], [0.5, 0.5, 0.5]),]),
+                memcached=args.memcached,
+                memcached_client=args.memcached_client) for idx in range(num_tasks)]
+            
             val_longest_size = max([int(np.ceil(len(vd) / float(bs))) for vd, bs in zip(val_dataset, args.val.batch_size)])
             val_sampler = [GivenSizeSampler(vd, total_size=val_longest_size * bs, sequential=True) for vd, bs in zip(val_dataset, args.val.batch_size)]
             val_loader = [DataLoader(
@@ -108,7 +128,13 @@ def main():
 
     if args.test.flag or args.evaluate: # online or offline evaluate
         args.test.batch_size *= args.ngpu
-        test_dataset = FaceDataset(args, 0, 'test')
+        #test_dataset = FaceDataset(args, 0, 'test')
+        test_dataset = BinDataset("data/testsets/{}.bin".format(args.test.benchmark),
+                                  transforms.Compose([
+                                  transforms.Resize(args.model.input_size),
+                                  transforms.ToTensor(),
+                                  transforms.Normalize([0.5, 0.5, 0.5], [0.5, 0.5, 0.5]),
+                                  ]))
         test_sampler = GivenSizeSampler(
             test_dataset, total_size=int(np.ceil(len(test_dataset) / float(args.test.batch_size)) * args.test.batch_size), sequential=True)
         test_loader = DataLoader(
@@ -117,7 +143,15 @@ def main():
 
     if args.extract: # feature extraction
         args.extract_info.batch_size *= args.ngpu
-        extract_dataset = FaceDataset(args, 0, 'extract')
+#        extract_dataset = FaceDataset(args, 0, 'extract')
+        extract_dataset = FileListDataset(
+            args.extract_info.data_list, args.extract_info.data_root,
+            transforms.Compose([
+                transforms.Resize(args.model.input_size),
+                transforms.ToTensor(),
+                transforms.Normalize([0.5, 0.5, 0.5], [0.5, 0.5, 0.5]),]),
+            memcached=args.memcached,
+            memcached_client=args.memcached_client)
         extract_sampler = GivenSizeSampler(
             extract_dataset, total_size=int(np.ceil(len(extract_dataset) / float(args.extract_info.batch_size)) * args.extract_info.batch_size), sequential=True)
         extract_loader = DataLoader(
@@ -129,7 +163,7 @@ def main():
     log("Creating model on [{}] gpus: {}".format(args.ngpu, args.gpus))
     if args.evaluate or args.extract:
         args.num_classes = None
-    model = models.MultiTaskWithLoss(backbone=args.model.backbone, num_classes=args.num_classes, feature_dim=args.model.feature_dim, spatial_size=args.transform.final_size, arc_fc=args.model.arc_fc, feat_bn=args.model.feat_bn)
+    model = models.MultiTaskWithLoss(backbone=args.model.backbone, num_classes=args.num_classes, feature_dim=args.model.feature_dim, spatial_size=args.model.input_size, arc_fc=args.model.arc_fc, feat_bn=args.model.feat_bn)
     os.environ["CUDA_VISIBLE_DEVICES"] = args.gpus
     model = nn.DataParallel(model)
     model.cuda()
@@ -180,13 +214,11 @@ def main():
     ## initial evaluate
     if args.test.flag and args.test.initial_test:
         log("*************** evaluation epoch [{}] ***************".format(start_epoch))
-        res = evaluation(test_loader, model, num=len(test_dataset), outfeat_fn="{}/checkpoints/ckpt_epoch_{}_{}.bin".format(args.save_path, start_epoch, args.test.benchmark), benchmark=args.test.benchmark)
-        if args.test.benchmark == "megaface":
-            tb_logger.add_scalar('megaface', res, start_epoch)
-        elif args.test.benchmark == "ijba":
-            tb_logger.add_scalar('ijba', res, start_epoch)
-        else:
-            raise Exception("No such benchmark: {}".format(args.test.benchmark))
+        res = evaluation(test_loader, model, num=len(test_dataset),
+                         outfeat_fn="{}/checkpoints/ckpt_epoch_{}_{}.bin".format(
+                         args.save_path, start_epoch, args.test.benchmark),
+                         benchmark=args.test.benchmark)
+        tb_logger.add_scalar(args.test.benchmark, res, start_epoch)
 
     ## training loop
     for epoch in range(start_epoch, args.train.max_epoch):
@@ -210,12 +242,7 @@ def main():
         if args.test.flag and ((epoch + 1) % args.test.interval == 0 or epoch + 1 == args.train.max_epoch):
             log("*************** evaluation epoch [{}] ***************".format(epoch + 1))
             res = evaluation(test_loader, model, num=len(test_dataset), outfeat_fn="{}/checkpoints/ckpt_epoch_{}_{}.bin".format(args.save_path, epoch + 1, args.test.benchmark), benchmark=args.test.benchmark)
-            if args.test.benchmark == "megaface":
-                tb_logger.add_scalar('megaface', res, epoch + 1)
-            elif args.test.benchmark == "ijba":
-                tb_logger.add_scalar('ijba', res, epoch + 1)
-            else:
-                raise Exception("No such benchmark: {}".format(args.test.benchmark))
+            tb_logger.add_scalar(args.test.benchmark, res, epoch + 1)
 
 
 def train(train_loader, model, optimizer, epoch, loss_weight, tb_logger, count):
@@ -338,7 +365,7 @@ def extract(ext_loader, model, num, output_file):
 
     start = time.time()
     end = time.time()
-    for i, (input, _) in enumerate(ext_loader):
+    for i, input in enumerate(ext_loader):
         data_time.update(time.time() - end)
         input_var = torch.autograd.Variable(input.cuda(), volatile=True)
         output = model(input_var, extract_mode=True)
@@ -358,6 +385,23 @@ def extract(ext_loader, model, num, output_file):
     return features
 
 def evaluation(test_loader, model, num, outfeat_fn, benchmark):
+    load_feat = False
+    if not os.path.isfile(outfeat_fn) or not load_feat:
+        features = extract(test_loader, model, num, outfeat_fn)
+    else:
+        log("Loading features: {}".format(outfeat_fn))
+        features = np.fromfile(outfeat_fn, dtype=np.float32).reshape(-1, args.model.feature_dim)
+
+    features = normalize(features)
+    _, lbs = bin_loader("data/testsets/{}.bin".format(benchmark))
+    _, _, acc, val, val_std, far = evaluate(
+        features, lbs, nrof_folds=args.test.nfolds, distance_metric=0)
+
+    log(" * {}: accuracy: {:.4f}({:.4f})".format(benchmark, acc.mean(), acc.std()))
+    return acc.mean()
+
+
+def evaluation_old(test_loader, model, num, outfeat_fn, benchmark):
     load_feat = False
     if not os.path.isfile(outfeat_fn) or not load_feat:
         features = extract(test_loader, model, num, outfeat_fn)

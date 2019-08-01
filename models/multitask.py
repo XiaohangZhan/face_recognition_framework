@@ -32,5 +32,7 @@ class MultiTaskWithLoss(nn.Module):
             if not self.arc_fc:
                 x = [self.fcs[k](feature[slice_idx[k]:slice_idx[k+1], ...]) for k in range(self.num_tasks)]
             else:
-                x = [self.fcs[k](feature[slice_idx[k]:slice_idx[k+1], ...], target[k]) for k in range(self.num_tasks)]
-            return [self.criterion(xx, tg) for xx, tg in zip(x, target)]
+                x = [self.fcs[k](feature[slice_idx[k]:slice_idx[k+1], ...],
+                    target[slice_idx[k]:slice_idx[k+1]]) for k in range(self.num_tasks)]
+            target_slice = [target[slice_idx[k]:slice_idx[k+1]] for k in range(self.num_tasks)]
+            return [self.criterion(xx, tg) for xx, tg in zip(x, target_slice)]
