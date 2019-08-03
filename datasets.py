@@ -227,7 +227,7 @@ def build_unlabeled_dataset(filelist, prefix):
     img_lst = []
     with open(filelist) as f:
         for x in f.readlines():
-            img_lst.append(os.path.join(prefix, x.strip()))
+            img_lst.append(os.path.join(prefix, x.strip().split(' ')[0]))
     return img_lst
 
 

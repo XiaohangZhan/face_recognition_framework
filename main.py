@@ -129,7 +129,7 @@ def main():
     if args.test.flag or args.evaluate: # online or offline evaluate
         args.test.batch_size *= args.ngpu
         #test_dataset = FaceDataset(args, 0, 'test')
-        test_dataset = BinDataset("data/testsets/{}.bin".format(args.test.benchmark),
+        test_dataset = BinDataset("{}/{}.bin".format(args.test.test_root, args.test.benchmark),
                                   transforms.Compose([
                                   transforms.Resize(args.model.input_size),
                                   transforms.ToTensor(),
@@ -393,7 +393,7 @@ def evaluation(test_loader, model, num, outfeat_fn, benchmark):
         features = np.fromfile(outfeat_fn, dtype=np.float32).reshape(-1, args.model.feature_dim)
 
     features = normalize(features)
-    _, lbs = bin_loader("data/testsets/{}.bin".format(benchmark))
+    _, lbs = bin_loader("{}/{}.bin".format(args.test.test_root, benchmark))
     _, _, acc, val, val_std, far = evaluate(
         features, lbs, nrof_folds=args.test.nfolds, distance_metric=0)
 

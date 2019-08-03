@@ -1,13 +1,13 @@
 workers: 16
 gpus: '0,1,2,3,4,5,6,7' # split using ","
-memcached: False
-memcached_client: ""
+memcached: True
+memcached_client: "/mnt/lustre/share/memcached_client"
 
 model:
     backbone: 'resnet50'
     feature_dim: 256
-    arc_fc: True
-    feat_bn: True
+    arc_fc: False
+    feat_bn: False
 
     input_size: 224
 
@@ -23,10 +23,6 @@ train:
     weight_decay: 0.0001
     print_freq: 20
     average_stats: 100
-    augmentation:
-        flip_aug: False
-        scale_aug: 0.04
-        trans_aug: 0.02
     data_root:
         - 'data/webface/images'
     data_list:
@@ -41,14 +37,15 @@ val:
 
 test:
     flag: True
-    initial_test: True
+    initial_test: False
     interval: 1
+    test_root: 'data/webface'
     benchmark: lfw
     batch_size: 128
     nfolds: 10
 
 extract_info:
-    batch_size: 128
+    batch_size: 64
     data_name: '' # used to name the feature file
     data_root: ''
     data_list: '' # image file name in each line

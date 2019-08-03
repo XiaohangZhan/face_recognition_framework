@@ -51,8 +51,6 @@ Online testing and visualization with Tensorboard.
       cd ~/data/face_recognition/
       unzip faces_CASIA_112x112.zip
       cd - # back to the repo root
-      mkdir -p data/testsets
-      cp ~/data/face_recognition/faces_webface_112x112/*.bin data/testsets/
       python tools/convert_data.py -r ~/data/face_recognition/faces_webface_112x112 -o ~/data/face_recognition/faces_webface_112x112 # convert mxnet records into images
       ln -s ~/data/face_recognition/faces_webface_112x112 data/webface
       ```
@@ -71,7 +69,7 @@ Online testing and visualization with Tensorboard.
 
 6. Feature extraction.
 
-      Firstly, specify the `data_root` and `data_list` under `extract_info` in the config file. Then execute:
+      Firstly, specify the `data_root` and `data_list` under `extract_info` in the config file. The `data_list` is a txt file containing image relative filename in each line. Then execute:
 
       ```
       sh experiments/webface/res50arc-bs64-sz224-ep35/extract.sh # feature file is stored in checkpoints/ckpt_epoch_*_*.bin
@@ -81,9 +79,9 @@ Online testing and visualization with Tensorboard.
 
 * Trained using Webface, resnet50
 
-| arch      | LFW(%) | CFP-FF(%) | CFP-FP(%) | AgeDB-30(%) | calfw(%) | cplfw(%) | vgg2_fp(%) |
-| --------- | ------ | --------- | --------- | ----------- | -------- | -------- | ---------- |
-| resnet-50 | 0.9850 | 0.9804    | 0.9117    | 0.8967      | 0.9013   | 0.8423   |            |
+| arch      | LFW(%) | CFP-FF(%) | CFP-FP(%) | AgeDB-30(%) | calfw(%) | cplfw(%) |
+| --------- | ------ | --------- | --------- | ----------- | -------- | -------- |
+| resnet-50 | 0.9850 | 0.9804    | 0.9117    | 0.8967      | 0.9013   | 0.8423   |
 
 ### Bibtex
 
