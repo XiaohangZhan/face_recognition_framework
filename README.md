@@ -79,6 +79,12 @@ Online testing and visualization with Tensorboard.
 
 ### Baselines
 
+* Trained using Webface, resnet50
+
+| arch      | LFW(%) | CFP-FF(%) | CFP-FP(%) | AgeDB-30(%) | calfw(%) | cplfw(%) | vgg2_fp(%) |
+| --------- | ------ | --------- | --------- | ----------- | -------- | -------- | ---------- |
+| resnet-50 | 0.9850 | 0.9804    | 0.9117    | 0.8967      | 0.9013   | 0.8423   |            |
+
 ### Bibtex
 
 If you find this code useful in your research, please cite:
