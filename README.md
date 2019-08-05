@@ -41,7 +41,7 @@ Online testing and visualization with Tensorboard.
 
 2. Dependency.
 
-    python>=3.6, tensorboardX, pytorch>=0.3.1
+    python>=3.6, tensorboardX, pytorch>=0.3.1, mxnet
 
 3. Data Preparation.
 
@@ -58,21 +58,35 @@ Online testing and visualization with Tensorboard.
 4. Training.
 
       ```
-      sh experiments/webface/res50arc-bs64-sz224-ep35/train.sh
+      sh experiments/webface/res50-bs64-sz224-ep35/train.sh
       ```
 
-5. Evalution.
+5. Monitoring.
 
       ```
-      sh experiments/webface/res50arc-bs64-sz224-ep35/evaluation.sh
+      tensorboard --logdir experiments
       ```
 
-6. Feature extraction.
-
-      Firstly, specify the `data_root` and `data_list` under `extract_info` in the config file. The `data_list` is a txt file containing image relative filename in each line. Then execute:
+6. Resume training.
 
       ```
-      sh experiments/webface/res50arc-bs64-sz224-ep35/extract.sh # feature file is stored in checkpoints/ckpt_epoch_*_*.bin
+      sh experiments/webface/res50-bs64-sz224-ep35/resume.sh 10 # e.g., resume from epoch 10
+      ```
+
+7. Evalution.
+
+      ```
+      sh experiments/webface/res50-bs64-sz224-ep35/evaluation.sh 35 # e.g., evaluate epoch 35
+      ```
+
+8. Feature extraction.
+
+      Firstly, specify the `data_name`, `data_root` and `data_list` under `extract_info` in the config file. The `data_list` is a txt file containing an image relative filename in each line. Then execute:
+
+      ```
+      # e.g., extract features with epoch 35 model.
+      # The feature file is stored in checkpoints/ckpt_epoch_35_[data_name].bin
+      sh experiments/webface/res50-bs64-sz224-ep35/extract.sh 35 
       ```
 
 ### Baselines

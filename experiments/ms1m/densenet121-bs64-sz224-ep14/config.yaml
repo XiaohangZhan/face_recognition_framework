@@ -1,0 +1,51 @@
+workers: 16
+gpus: '0,1,2,3,4,5,6,7' # split using ","
+memcached: False
+memcached_client: ""
+
+model:
+    backbone: 'densenet121'
+    feature_dim: 256
+    arc_fc: False
+    feat_bn: False
+
+    input_size: 224
+
+train:
+    rand_seed: 0
+    batch_size: [64]
+    loss_weight: [1.0]
+    base_lr: 0.1
+    lr_decay_scale: 0.1
+    lr_decay_steps: [8, 12]
+    max_epoch: 14
+    momentum: 0.9
+    weight_decay: 0.0001
+    print_freq: 20
+    average_stats: 100
+    data_root:
+        - 'data/ms1m/images'
+    data_list:
+        - 'data/ms1m/list.txt'
+
+val:
+    flag: False
+    batch_size: [64]
+    data_root: 
+    data_list: 
+    data_meta:
+
+test:
+    flag: True
+    initial_test: True
+    interval: 1
+    test_root: 'data/ms1m'
+    benchmark: lfw
+    batch_size: 128
+    nfolds: 10
+
+extract_info:
+    batch_size: 64
+    data_name: '' # used to name the feature file
+    data_root: ''
+    data_list: '' # image file name in each line

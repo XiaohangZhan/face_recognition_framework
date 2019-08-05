@@ -235,6 +235,7 @@ def main():
             'optimizer' : optimizer.state_dict(),
             'count': count[0]
         }, args.save_path + "/checkpoints/ckpt_epoch", epoch + 1, is_last=(epoch + 1 == args.train.max_epoch))
+
         # validate
         if args.val.flag:
             validate(val_loader, model, epoch, args.train.loss_weight, len(train_loader[0]), tb_logger, count)

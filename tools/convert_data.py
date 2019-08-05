@@ -6,7 +6,6 @@ import mxnet as mx
 import cv2
 from tqdm import tqdm
 
-
 def load_mx_rec(rec_path, save_path, write_img=True):
     if not os.path.isdir(save_path + "/images"):
         os.makedirs(save_path + "images")
@@ -52,7 +51,7 @@ def main():
     parser.add_argument("-o", "--output_path", type=str)
     args = parser.parse_args()
 
-    load_mx_rec(args.rec_path, args.output_path, write_img=False)
+    load_mx_rec(args.rec_path, args.output_path, write_img=True)
 
 
 if __name__ == "__main__":

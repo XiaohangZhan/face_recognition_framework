@@ -1,5 +1,4 @@
 import torch
-import mc
 from torch.utils.data import Dataset
 from torch.utils.data.sampler import Sampler
 import numpy as np
@@ -8,7 +7,10 @@ import io
 import test
 from PIL import Image
 import torchvision.transforms as transforms
-
+try:
+    import mc
+except ImportError:
+    pass
 from utils import bin_loader
 
 import pdb
