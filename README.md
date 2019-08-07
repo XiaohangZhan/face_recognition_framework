@@ -91,11 +91,18 @@ Online testing and visualization with Tensorboard.
 
 ### Baselines
 
-* Trained using Webface, resnet50
+* Trained using Webface
 
 | arch      | LFW(%) | CFP-FF(%) | CFP-FP(%) | AgeDB-30(%) | calfw(%) | cplfw(%) |
 | --------- | ------ | --------- | --------- | ----------- | -------- | -------- |
 | resnet-50 | 0.9850 | 0.9804    | 0.9117    | 0.8967      | 0.9013   | 0.8423   |
+
+* Trained using MS1M
+
+| arch             | LFW(%) | CFP-FF(%) | CFP-FP(%) | AgeDB-30(%) | calfw(%) | cplfw(%) | vgg2-FP |
+| ---------------- | ------ | --------- | --------- | ----------- | -------- | -------- | ------- |
+| densenet-121     | 0.9948 | 0.9946    | 0.9594    | 0.9615      | 0.9500   | 0.9057   | 0.9418  |
+| densenet-121-arc | 0.9973 | 0.9979    | 0.9601    | 0.9728      | 0.9558   | 0.9063   | 0.9496  |
 
 ### Bibtex
 
