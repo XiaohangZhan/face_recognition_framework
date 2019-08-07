@@ -4,10 +4,10 @@ memcached: False
 memcached_client: ""
 
 model:
-    backbone: 'resnet50'
+    backbone: 'densenet121'
     feature_dim: 256
-    arc_fc: False
-    feat_bn: False
+    arc_fc: True
+    feat_bn: True
 
     input_size: 224
 
@@ -17,16 +17,16 @@ train:
     loss_weight: [1.0]
     base_lr: 0.3
     lr_decay_scale: 0.1
-    lr_decay_steps: [20, 30]
-    max_epoch: 35
+    lr_decay_steps: [8, 12]
+    max_epoch: 14
     momentum: 0.9
     weight_decay: 0.0001
     print_freq: 20
     average_stats: 100
     data_root:
-        - 'data/webface/images'
+        - 'data/ms1m/images'
     data_list:
-        - 'data/webface/list.txt'
+        - 'data/ms1m/list.txt'
 
 val:
     flag: False
@@ -37,11 +37,11 @@ val:
 
 test:
     flag: True
-    initial_test: False
+    initial_test: True
     interval: 1
-    test_root: 'data/webface'
-    benchmark: ['lfw', 'cfp_ff', 'cfp_fp', 'agedb_30', 'calfw', 'cplfw']
-    batch_size: 128
+    test_root: 'data/ms1m'
+    benchmark: ['lfw', 'cfp_ff', 'cfp_fp', 'agedb_30', 'calfw', 'cplfw', 'vgg2_fp']
+    batch_size: 64
     nfolds: 10
 
 extract_info:
