@@ -40,7 +40,7 @@ test:
     initial_test: False
     interval: 1
     test_root: 'data/webface'
-    benchmark: lfw
+    benchmark: ['lfw', 'cfp_ff', 'cfp_fp', 'agedb_30', 'calfw', 'cplfw']
     batch_size: 128
     nfolds: 10
 

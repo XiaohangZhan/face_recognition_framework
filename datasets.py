@@ -150,11 +150,12 @@ class GivenSizeSampler(Sampler):
     '''
     Sampler with given total size
     '''
-    def __init__(self, dataset, total_size=None, rand_seed=None, sequential=False):
+    def __init__(self, dataset, total_size=None, rand_seed=None, sequential=False, silent=False):
         self.rand_seed = rand_seed if rand_seed is not None else 0
         self.dataset = dataset
         self.epoch = 0
         self.sequential = sequential
+        self.silent = silent
         self.total_size = total_size if total_size is not None else len(self.dataset)
 
     def __iter__(self):
@@ -169,7 +170,8 @@ class GivenSizeSampler(Sampler):
 
         # add extra samples to meet self.total_size
         extra = self.total_size - len(origin_indices)
-        print('Origin Size: {}\tAligned Size: {}'.format(len(origin_indices), self.total_size))
+        if not self.silent:
+            print('Origin Size: {}\tAligned Size: {}'.format(len(origin_indices), self.total_size))
         if extra < 0:
             indices = indices[:self.total_size]
         while extra > 0:

@@ -38,6 +38,7 @@ parser.add_argument('--config', type=str, required=True)
 parser.add_argument('--load-path', default='', type=str)
 parser.add_argument('--resume', action='store_true')
 parser.add_argument('--evaluate', action='store_true')
+parser.add_argument('--evalset', type=str, default='lfw')
 parser.add_argument('--extract', action='store_true')
 
 def main():
@@ -128,18 +129,19 @@ def main():
 
     if args.test.flag or args.evaluate: # online or offline evaluate
         args.test.batch_size *= args.ngpu
-        #test_dataset = FaceDataset(args, 0, 'test')
-        test_dataset = BinDataset("{}/{}.bin".format(args.test.test_root, args.test.benchmark),
+        test_dataset = [BinDataset("{}/{}.bin".format(args.test.test_root, tb),
                                   transforms.Compose([
                                   transforms.Resize(args.model.input_size),
                                   transforms.ToTensor(),
                                   transforms.Normalize([0.5, 0.5, 0.5], [0.5, 0.5, 0.5]),
-                                  ]))
-        test_sampler = GivenSizeSampler(
-            test_dataset, total_size=int(np.ceil(len(test_dataset) / float(args.test.batch_size)) * args.test.batch_size), sequential=True)
-        test_loader = DataLoader(
-            test_dataset, batch_size=args.test.batch_size, shuffle=False,
-            num_workers=args.workers, pin_memory=False, sampler=test_sampler)
+                                  ])) for tb in args.test.benchmark]
+        test_sampler = [GivenSizeSampler(td,
+            total_size=int(np.ceil(len(td) / float(args.test.batch_size)) * args.test.batch_size),
+            sequential=True, silent=True) for td in test_dataset]
+        test_loader = [DataLoader(
+            td, batch_size=args.test.batch_size, shuffle=False,
+            num_workers=args.workers, pin_memory=False, sampler=ts)
+            for td, ts in zip(test_dataset, test_sampler)]
 
     if args.extract: # feature extraction
         args.extract_info.batch_size *= args.ngpu
@@ -188,7 +190,10 @@ def main():
 
     ## offline evaluate
     if args.evaluate:
-        evaluation(test_loader, model, num=len(test_dataset), outfeat_fn="{}_{}.bin".format(args.load_path[:-8], args.test.benchmark), benchmark=args.test.benchmark)
+        for tb, tl, td in zip(args.test.benchmark, test_loader, test_dataset):
+            evaluation(tl, model, num=len(td),
+                       outfeat_fn="{}_{}.bin".format(args.load_path[:-8], tb),
+                       benchmark=tb)
         return
 
     ## feature extraction
@@ -214,11 +219,12 @@ def main():
     ## initial evaluate
     if args.test.flag and args.test.initial_test:
         log("*************** evaluation epoch [{}] ***************".format(start_epoch))
-        res = evaluation(test_loader, model, num=len(test_dataset),
-                         outfeat_fn="{}/checkpoints/ckpt_epoch_{}_{}.bin".format(
-                         args.save_path, start_epoch, args.test.benchmark),
-                         benchmark=args.test.benchmark)
-        tb_logger.add_scalar(args.test.benchmark, res, start_epoch)
+        for tb, tl, td in zip(args.test.benchmark, test_loader, test_dataset):
+            res = evaluation(tl, model, num=len(td),
+                             outfeat_fn="{}/checkpoints/ckpt_epoch_{}_{}.bin".format(
+                             args.save_path, start_epoch, tb),
+                             benchmark=tb)
+            tb_logger.add_scalar(tb, res, start_epoch)
 
     ## training loop
     for epoch in range(start_epoch, args.train.max_epoch):
@@ -242,8 +248,12 @@ def main():
         # online evaluate
         if args.test.flag and ((epoch + 1) % args.test.interval == 0 or epoch + 1 == args.train.max_epoch):
             log("*************** evaluation epoch [{}] ***************".format(epoch + 1))
-            res = evaluation(test_loader, model, num=len(test_dataset), outfeat_fn="{}/checkpoints/ckpt_epoch_{}_{}.bin".format(args.save_path, epoch + 1, args.test.benchmark), benchmark=args.test.benchmark)
-            tb_logger.add_scalar(args.test.benchmark, res, epoch + 1)
+            for tb, tl, td in zip(args.test.benchmark, test_loader, test_dataset):
+                res = evaluation(tl, model, num=len(td),
+                                 outfeat_fn="{}/checkpoints/ckpt_epoch_{}_{}.bin".format(
+                                 args.save_path, epoch + 1, tb),
+                                 benchmark=tb)
+                tb_logger.add_scalar(tb, res, start_epoch)
 
 
 def train(train_loader, model, optimizer, epoch, loss_weight, tb_logger, count):
@@ -358,7 +368,7 @@ def validate(val_loader, model, criterion, epoch, loss_weight, train_len, tb_log
     for k in range(num_tasks):
         tb_logger.add_scalar('val_loss_{}'.format(k), losses[k].val, count[0])
 
-def extract(ext_loader, model, num, output_file):
+def extract(ext_loader, model, num, output_file, silent=False):
     batch_time = AverageMeter(9999999)
     data_time = AverageMeter(9999999)
     model.eval()
@@ -374,7 +384,7 @@ def extract(ext_loader, model, num, output_file):
         batch_time.update(time.time() - end)
         end = time.time()
 
-        if i % args.train.print_freq == 0:
+        if i % args.train.print_freq == 0 and not silent:
             log("Extracting: {0}/{1}\t"
                     "Time {batch_time.val:.3f} ({batch_time.avg:.3f})\t"
                     "Data {data_time.val:.3f} ({data_time.avg:.3f})".format(
@@ -382,15 +392,15 @@ def extract(ext_loader, model, num, output_file):
 
     features = np.concatenate(features, axis=0)[:num, :]
     features.tofile(output_file)
-    log("Extracting Done. Total time: {}".format(time.time() - start))
+    if not silent:
+        log("Extracting Done. Total time: {}".format(time.time() - start))
     return features
 
 def evaluation(test_loader, model, num, outfeat_fn, benchmark):
     load_feat = False
     if not os.path.isfile(outfeat_fn) or not load_feat:
-        features = extract(test_loader, model, num, outfeat_fn)
+        features = extract(test_loader, model, num, outfeat_fn, silent=True)
     else:
-        log("Loading features: {}".format(outfeat_fn))
         features = np.fromfile(outfeat_fn, dtype=np.float32).reshape(-1, args.model.feature_dim)
 
     features = normalize(features)
@@ -402,32 +412,32 @@ def evaluation(test_loader, model, num, outfeat_fn, benchmark):
     return acc.mean()
 
 
-def evaluation_old(test_loader, model, num, outfeat_fn, benchmark):
-    load_feat = False
-    if not os.path.isfile(outfeat_fn) or not load_feat:
-        features = extract(test_loader, model, num, outfeat_fn)
-    else:
-        log("Loading features: {}".format(outfeat_fn))
-        features = np.fromfile(outfeat_fn, dtype=np.float32).reshape(-1, args.model.feature_dim)
-
-    if benchmark == "megaface":
-        r = test.test_megaface(features)
-        log(' * Megaface: 1e-6 [{}], 1e-5 [{}], 1e-4 [{}]'.format(r[-1], r[-2], r[-3]))
-        with open(outfeat_fn[:-4] + ".txt", 'w') as f:
-            f.write(' * Megaface: 1e-6 [{}], 1e-5 [{}], 1e-4 [{}]'.format(r[-1], r[-2], r[-3]))
-        return r[-1]
-    elif benchmark == "ijba":
-        r = test.test_ijba(features)
-        log(' * IJB-A: {} [{}], {} [{}], {} [{}]'.format(r[0][0], r[0][1], r[1][0], r[1][1], r[2][0], r[2][1]))
-        with open(outfeat_fn[:-4] + ".txt", 'w') as f:
-            f.write(' * IJB-A: {} [{}], {} [{}], {} [{}]'.format(r[0][0], r[0][1], r[1][0], r[1][1], r[2][0], r[2][1]))
-        return r[2][1]
-    elif benchmark == "lfw":
-        r = test.test_lfw(features)
-        log(' * LFW: mean: {} std: {}'.format(r[0], r[1]))
-        with open(outfeat_fn[:-4] + ".txt", 'w') as f:
-            f.write(' * LFW: mean: {} std: {}'.format(r[0], r[1]))
-        return r[0]
+#def evaluation_old(test_loader, model, num, outfeat_fn, benchmark):
+#    load_feat = False
+#    if not os.path.isfile(outfeat_fn) or not load_feat:
+#        features = extract(test_loader, model, num, outfeat_fn)
+#    else:
+#        log("Loading features: {}".format(outfeat_fn))
+#        features = np.fromfile(outfeat_fn, dtype=np.float32).reshape(-1, args.model.feature_dim)
+#
+#    if benchmark == "megaface":
+#        r = test.test_megaface(features)
+#        log(' * Megaface: 1e-6 [{}], 1e-5 [{}], 1e-4 [{}]'.format(r[-1], r[-2], r[-3]))
+#        with open(outfeat_fn[:-4] + ".txt", 'w') as f:
+#            f.write(' * Megaface: 1e-6 [{}], 1e-5 [{}], 1e-4 [{}]'.format(r[-1], r[-2], r[-3]))
+#        return r[-1]
+#    elif benchmark == "ijba":
+#        r = test.test_ijba(features)
+#        log(' * IJB-A: {} [{}], {} [{}], {} [{}]'.format(r[0][0], r[0][1], r[1][0], r[1][1], r[2][0], r[2][1]))
+#        with open(outfeat_fn[:-4] + ".txt", 'w') as f:
+#            f.write(' * IJB-A: {} [{}], {} [{}], {} [{}]'.format(r[0][0], r[0][1], r[1][0], r[1][1], r[2][0], r[2][1]))
+#        return r[2][1]
+#    elif benchmark == "lfw":
+#        r = test.test_lfw(features)
+#        log(' * LFW: mean: {} std: {}'.format(r[0], r[1]))
+#        with open(outfeat_fn[:-4] + ".txt", 'w') as f:
+#            f.write(' * LFW: mean: {} std: {}'.format(r[0], r[1]))
+#        return r[0]
 
 
 if __name__ == '__main__':

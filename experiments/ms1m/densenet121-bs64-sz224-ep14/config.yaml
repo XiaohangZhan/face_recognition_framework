@@ -40,7 +40,7 @@ test:
     initial_test: True
     interval: 1
     test_root: 'data/ms1m'
-    benchmark: lfw
+    benchmark: ['lfw', 'cfp_ff', 'cfp_fp', 'agedb_30', 'calfw', 'cplfw', 'vgg2_fp']
     batch_size: 128
     nfolds: 10
 
