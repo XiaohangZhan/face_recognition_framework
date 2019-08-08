@@ -23,7 +23,7 @@ import models
 from datasets import GivenSizeSampler, BinDataset, FileListLabeledDataset, FileListDataset
 from utils import AverageMeter, load_state, save_state, log, normalize, bin_loader
 import test
-from evaluation import evaluate
+from evaluation import evaluate, test_megaface
 
 model_names = sorted(name for name in models.backbones.__dict__
     if name.islower() and not name.startswith("__")
@@ -38,7 +38,6 @@ parser.add_argument('--config', type=str, required=True)
 parser.add_argument('--load-path', default='', type=str)
 parser.add_argument('--resume', action='store_true')
 parser.add_argument('--evaluate', action='store_true')
-parser.add_argument('--evalset', type=str, default='lfw')
 parser.add_argument('--extract', action='store_true')
 
 def main():
@@ -129,12 +128,21 @@ def main():
 
     if args.test.flag or args.evaluate: # online or offline evaluate
         args.test.batch_size *= args.ngpu
-        test_dataset = [BinDataset("{}/{}.bin".format(args.test.test_root, tb),
-                                  transforms.Compose([
-                                  transforms.Resize(args.model.input_size),
-                                  transforms.ToTensor(),
-                                  transforms.Normalize([0.5, 0.5, 0.5], [0.5, 0.5, 0.5]),
-                                  ])) for tb in args.test.benchmark]
+        test_dataset = []
+        for tb in args.test.benchmark:
+            if tb == 'megaface':
+                test_dataset.append(FileListDataset(args.test.megaface_list,
+                    args.test.megaface_root, transforms.Compose([
+                    transforms.Resize(args.model.input_size),
+                    transforms.ToTensor(),
+                    transforms.Normalize([0.5, 0.5, 0.5], [0.5, 0.5, 0.5]),])))
+            else:
+                test_dataset.append(BinDataset("{}/{}.bin".format(args.test.test_root, tb),
+                    transforms.Compose([
+                    transforms.Resize(args.model.input_size),
+                    transforms.ToTensor(),
+                    transforms.Normalize([0.5, 0.5, 0.5], [0.5, 0.5, 0.5]),
+                    ])))
         test_sampler = [GivenSizeSampler(td,
             total_size=int(np.ceil(len(td) / float(args.test.batch_size)) * args.test.batch_size),
             sequential=True, silent=True) for td in test_dataset]
@@ -397,47 +405,53 @@ def extract(ext_loader, model, num, output_file, silent=False):
     return features
 
 def evaluation(test_loader, model, num, outfeat_fn, benchmark):
-    load_feat = False
+    load_feat = True
     if not os.path.isfile(outfeat_fn) or not load_feat:
         features = extract(test_loader, model, num, outfeat_fn, silent=True)
     else:
+        print("loading from: {}".format(outfeat_fn))
         features = np.fromfile(outfeat_fn, dtype=np.float32).reshape(-1, args.model.feature_dim)
 
-    features = normalize(features)
-    _, lbs = bin_loader("{}/{}.bin".format(args.test.test_root, benchmark))
-    _, _, acc, val, val_std, far = evaluate(
-        features, lbs, nrof_folds=args.test.nfolds, distance_metric=0)
+    if benchmark == "megaface":
+        r = test_megaface(features)
+        log(' * Megaface: 1e-6 [{}], 1e-5 [{}], 1e-4 [{}]'.format(r[-1], r[-2], r[-3]))
+        return r[-1]
+    else:
+        features = normalize(features)
+        _, lbs = bin_loader("{}/{}.bin".format(args.test.test_root, benchmark))
+        _, _, acc, val, val_std, far = evaluate(
+            features, lbs, nrof_folds=args.test.nfolds, distance_metric=0)
+    
+        log(" * {}: accuracy: {:.4f}({:.4f})".format(benchmark, acc.mean(), acc.std()))
+        return acc.mean()
 
-    log(" * {}: accuracy: {:.4f}({:.4f})".format(benchmark, acc.mean(), acc.std()))
-    return acc.mean()
 
+def evaluation_old(test_loader, model, num, outfeat_fn, benchmark):
+    load_feat = False
+    if not os.path.isfile(outfeat_fn) or not load_feat:
+        features = extract(test_loader, model, num, outfeat_fn)
+    else:
+        log("Loading features: {}".format(outfeat_fn))
+        features = np.fromfile(outfeat_fn, dtype=np.float32).reshape(-1, args.model.feature_dim)
 
-#def evaluation_old(test_loader, model, num, outfeat_fn, benchmark):
-#    load_feat = False
-#    if not os.path.isfile(outfeat_fn) or not load_feat:
-#        features = extract(test_loader, model, num, outfeat_fn)
-#    else:
-#        log("Loading features: {}".format(outfeat_fn))
-#        features = np.fromfile(outfeat_fn, dtype=np.float32).reshape(-1, args.model.feature_dim)
-#
-#    if benchmark == "megaface":
-#        r = test.test_megaface(features)
-#        log(' * Megaface: 1e-6 [{}], 1e-5 [{}], 1e-4 [{}]'.format(r[-1], r[-2], r[-3]))
-#        with open(outfeat_fn[:-4] + ".txt", 'w') as f:
-#            f.write(' * Megaface: 1e-6 [{}], 1e-5 [{}], 1e-4 [{}]'.format(r[-1], r[-2], r[-3]))
-#        return r[-1]
-#    elif benchmark == "ijba":
-#        r = test.test_ijba(features)
-#        log(' * IJB-A: {} [{}], {} [{}], {} [{}]'.format(r[0][0], r[0][1], r[1][0], r[1][1], r[2][0], r[2][1]))
-#        with open(outfeat_fn[:-4] + ".txt", 'w') as f:
-#            f.write(' * IJB-A: {} [{}], {} [{}], {} [{}]'.format(r[0][0], r[0][1], r[1][0], r[1][1], r[2][0], r[2][1]))
-#        return r[2][1]
-#    elif benchmark == "lfw":
-#        r = test.test_lfw(features)
-#        log(' * LFW: mean: {} std: {}'.format(r[0], r[1]))
-#        with open(outfeat_fn[:-4] + ".txt", 'w') as f:
-#            f.write(' * LFW: mean: {} std: {}'.format(r[0], r[1]))
-#        return r[0]
+    if benchmark == "megaface":
+        r = test.test_megaface(features)
+        log(' * Megaface: 1e-6 [{}], 1e-5 [{}], 1e-4 [{}]'.format(r[-1], r[-2], r[-3]))
+        with open(outfeat_fn[:-4] + ".txt", 'w') as f:
+            f.write(' * Megaface: 1e-6 [{}], 1e-5 [{}], 1e-4 [{}]'.format(r[-1], r[-2], r[-3]))
+        return r[-1]
+    elif benchmark == "ijba":
+        r = test.test_ijba(features)
+        log(' * IJB-A: {} [{}], {} [{}], {} [{}]'.format(r[0][0], r[0][1], r[1][0], r[1][1], r[2][0], r[2][1]))
+        with open(outfeat_fn[:-4] + ".txt", 'w') as f:
+            f.write(' * IJB-A: {} [{}], {} [{}], {} [{}]'.format(r[0][0], r[0][1], r[1][0], r[1][1], r[2][0], r[2][1]))
+        return r[2][1]
+    elif benchmark == "lfw":
+        r = test.test_lfw(features)
+        log(' * LFW: mean: {} std: {}'.format(r[0], r[1]))
+        with open(outfeat_fn[:-4] + ".txt", 'w') as f:
+            f.write(' * LFW: mean: {} std: {}'.format(r[0], r[1]))
+        return r[0]
 
 
 if __name__ == '__main__':
