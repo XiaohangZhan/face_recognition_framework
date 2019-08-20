@@ -296,7 +296,7 @@ def train(train_loader, model, optimizer, epoch, loss_weight, tb_logger, count):
         data_time.update(time.time() - end)
 
         input_var = torch.autograd.Variable(input.cuda())
-        target_var = torch.autograd.Variable(target.cuda(async=True))
+        target_var = torch.autograd.Variable(target.cuda())
 
         # measure accuracy and record loss
         loss = model(input_var, target_var, slice_idx)
@@ -359,7 +359,7 @@ def validate(val_loader, model, criterion, epoch, loss_weight, train_len, tb_log
 
         input = torch.cat(tuple(input), dim=0)
 
-        target = [tg.cuda(async=True) for tg in target]
+        target = [tg.cuda() for tg in target]
         input_var = torch.autograd.Variable(input.cuda(), volatile=True)
         target_var = [torch.autograd.Variable(tg, volatile=True) for tg in target]
 

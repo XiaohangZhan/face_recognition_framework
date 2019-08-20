@@ -41,7 +41,7 @@ Online testing and visualization with Tensorboard.
 
 2. Dependency.
 
-    python>=3.6, tensorboardX, pytorch>=0.3.1, mxnet
+    python>=3.6, tensorboardX, pytorch>=0.3.1, mxnet, sklearn
 
 3. Data Preparation.
 
