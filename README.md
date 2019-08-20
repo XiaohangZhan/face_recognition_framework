@@ -54,6 +54,28 @@ Online testing and visualization with Tensorboard.
       python tools/convert_data.py -r ~/data/face_recognition/faces_webface_112x112 -o ~/data/face_recognition/faces_webface_112x112 # convert mxnet records into images
       ln -s ~/data/face_recognition/faces_webface_112x112 data/webface
       ```
+      
+      Optionally, if you want to test on MegaFace. Download testing set from [here](https://www.dropbox.com/s/5ko2dcd1x7vn37w/megaface_testpack_v1.0.zip?dl=0) into your data storage folder, e.g., `~/data/face_recognition/`. Then:
+      
+      ```sh
+      cd ~/data/face_recognition/
+      mkdir -p megaface_test/raw
+      cd megaface_test/raw
+      mv ../../megaface_testpack_v1.0.zip .
+      unzip -q megaface_testpack_v1.0.zip
+      cd $THIS_REPO # back to the repo root
+      ln -s  ~/data/face_recognition/megaface_test data/megaface_test
+      ```
+      Next, download MegaFace lists from [here](https://drive.google.com/open?id=15ZmNT4AhRKClaHDpDxVw_fCKoli3woF8) into `~/data/face_recognition/megaface_test/`.
+      Finally, the folder `data/megaface_test/` looks like:
+      ```
+      data
+        ├── megaface_test
+          ├── concat_list.txt
+          ├── facescrub3530
+          ├── megaface_distractor
+          ├── raw
+      ```
 
 4. Training.
 
