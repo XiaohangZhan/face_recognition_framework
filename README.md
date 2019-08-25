@@ -24,7 +24,7 @@ Loss: Softmax Loss, ArcFace
 
 Backbone CNN: ResNet, DenseNet, Inception, InceptionResNet, NASNet, VGG
 
-Benchmarks: Megaface (FaceScrub), IJB-A, LFW
+Benchmarks: Megaface (FaceScrub), IJB-A, LFW, CFP-FF, CFP-FP, AgeDB-30, calfw, cplfw
 
 Data aug: flip, scale, translation
 
@@ -141,4 +141,8 @@ If you find this code useful in your research, please cite:
 }
 ```
 
-### TODO
+### TODO (Will carry out in a "Buddha-like" way)
+
+1. Implement distributed training.
+2. Adjust hyper-parameters.
+3. Multi-task experiments.
