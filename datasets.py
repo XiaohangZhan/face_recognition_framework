@@ -4,7 +4,6 @@ from torch.utils.data.sampler import Sampler
 import numpy as np
 import os
 import io
-import test
 from PIL import Image
 import torchvision.transforms as transforms
 try:
@@ -21,130 +20,130 @@ def pil_loader(img_str):
         img = img.convert('RGB')
     return img
 
-class FaceDataset(Dataset):
-    def __init__(self, config, task_idx, phase):
-        self.root_dir = config.train.data_root[task_idx]
-        self.config = config
-        assert phase in ['train', 'val', 'test', 'extract']
-        self.phase = phase
-        
-        if phase in ['train', 'val']:
-            print("Building task #{} dataset from {} and {}".format(task_idx, config.train.data_list[task_idx], config.train.data_meta[task_idx]))
-            with open(config.train.data_list[task_idx], 'r') as f:
-                lines = f.readlines()
-                self.lists = [os.path.join(config.train.data_root[task_idx], l.strip()) for l in lines]
-            with open(config.train.data_meta[task_idx], 'r') as f:
-                lines = f.readlines()
-                num_img, num_class = lines[0].strip().split()
-                self.num_img, self.num_class = int(num_img), int(num_class)
-                self.metas = [int(l.strip()) for l in lines[1:]]
-            assert self.num_img == len(self.lists)
-            assert self.num_img == len(self.metas)
-            assert self.num_class > max(self.metas)
-        elif phase == "test": # test
-            if config.test.benchmark == "megaface":
-                self.lists = test.megaface.build_testset()
-            elif config.test.benchmark == "ijba":
-                self.lists = test.ijba.build_testset()
-            elif config.test.benchmark == 'lfw':
-                self.lists = test.lfw.build_testset()
-            else:
-                raise Exception("No such benchmark: {}".format(config.test.benchmark))
-            self.num_img = len(self.lists)
-            self.metas = None
-        else: # extract
-            with open(config.extract_info.data_list, 'r') as f:
-                lines = f.readlines()
-                self.lists = [os.path.join(config.extract_info.data_root, l.strip()) for l in lines]
-            self.num_img = len(self.lists)
-            self.metas = None
-
-        normalize = transforms.Normalize(mean=[0.5, 0.5, 0.5], std=[0.3125, 0.3125, 0.3125])
-        self.transforms = transforms.Compose([transforms.ToTensor(), normalize])
-        self.initialized = False
- 
-    def __len__(self):
-        return self.num_img
- 
-    def __init_memcached(self):
-        if not self.initialized:
-            server_list_config_file = "{}/server_list.conf".format(self.config.memcached_client)
-            client_config_file = "{}/client.conf".format(self.config.memcached_client)
-            self.mclient = mc.MemcachedClient.GetInstance(server_list_config_file, client_config_file)
-            self.initialized = True
-
-    def _read_one(self, idx=None):
-        if idx is None:
-            idx = np.random.randint(self.num_img)
-        filename = self.lists[idx]
-        if self.metas is not None:
-            label = self.metas[idx]
-        else:
-            label = 0
-        try:
-            value = mc.pyvector()
-            self.mclient.Get(filename, value)
-            value_str = mc.ConvertBuffer(value)
-            img = pil_loader(value_str)
-        except:
-            print('Read image[{}] failed ({})'.format(idx, filename))
-            return self._read_one()
-        else:
-            return img, label
-            
-    def __getitem__(self, idx):
-        self.__init_memcached()
-        ## memcached
-        if self.config.memcached:
-            img, label = self._read_one(idx)
-        else:
-            filename = self.lists[idx]
-            if self.metas is not None:
-                label = self.metas[idx]
-            else:
-                label = 0
-            if not os.path.isfile(filename):
-                raise Exception('Read image[{}] failed ({})'.format(idx, filename))
-            img = Image.open(filename).convert('RGB')
-
-        ## transform & aug
-        if self.phase == 'train' and self.config.train.augmentation['flip_aug']:
-            if np.random.rand() < 0.5:
-                img = img.transpose(Image.FLIP_LEFT_RIGHT)
-        if self.phase == 'train':
-            scale_height_diff = (np.random.rand() * 2 - 1) * self.config.train.augmentation['scale_aug']
-            scale_width_diff = (np.random.rand() * 2 - 1) * self.config.train.augmentation['scale_aug']
-            trans_diff_x = (np.random.rand() * 2 - 1) * self.config.train.augmentation['trans_aug']
-            trans_diff_y = (np.random.rand() * 2 - 1) * self.config.train.augmentation['trans_aug']
-        else:
-            scale_height_diff = 0.
-            scale_width_diff = 0.
-            trans_diff_x = 0.
-            trans_diff_y = 0.
-
-        crop_height_aug = self.config.transform.crop_size * (1 + scale_height_diff)
-        crop_width_aug = self.config.transform.crop_size * (1 + scale_width_diff)
-        center = (img.width / 2. * (1 + trans_diff_x), (img.height / 2. + self.config.transform.crop_center_y_offset) * (1 + trans_diff_y))
-
-        if center[0] < crop_width_aug / 2:
-            crop_width_aug = center[0] * 2 - 0.5
-        if center[1] < crop_height_aug / 2:
-            crop_height_aug = center[1] * 2 - 0.5
-        if center[0] + crop_width_aug / 2 >= img.width:
-            crop_width_aug = (img.width - center[0]) * 2 - 0.5
-        if center[1] + crop_height_aug / 2 >= img.height:
-            crop_height_aug = (img.height - center[1]) * 2 - 0.5
-
-        rect = (center[0] - crop_width_aug / 2, center[1] - crop_height_aug / 2,
-                center[0] + crop_width_aug / 2, center[1] + crop_height_aug / 2)
-        img = img.crop(rect)
-        img = img.resize((self.config.transform.final_size, self.config.transform.final_size), Image.BICUBIC)
-
-        if False: #DEBUG
-            img.save("output/{}.jpg".format(idx))
-
-        img = self.transforms(img)
-        return img, label
+#class FaceDataset(Dataset):
+#    def __init__(self, config, task_idx, phase):
+#        self.root_dir = config.train.data_root[task_idx]
+#        self.config = config
+#        assert phase in ['train', 'val', 'test', 'extract']
+#        self.phase = phase
+#        
+#        if phase in ['train', 'val']:
+#            print("Building task #{} dataset from {} and {}".format(task_idx, config.train.data_list[task_idx], config.train.data_meta[task_idx]))
+#            with open(config.train.data_list[task_idx], 'r') as f:
+#                lines = f.readlines()
+#                self.lists = [os.path.join(config.train.data_root[task_idx], l.strip()) for l in lines]
+#            with open(config.train.data_meta[task_idx], 'r') as f:
+#                lines = f.readlines()
+#                num_img, num_class = lines[0].strip().split()
+#                self.num_img, self.num_class = int(num_img), int(num_class)
+#                self.metas = [int(l.strip()) for l in lines[1:]]
+#            assert self.num_img == len(self.lists)
+#            assert self.num_img == len(self.metas)
+#            assert self.num_class > max(self.metas)
+#        elif phase == "test": # test
+#            if config.test.benchmark == "megaface":
+#                self.lists = test.megaface.build_testset()
+#            elif config.test.benchmark == "ijba":
+#                self.lists = test.ijba.build_testset()
+#            elif config.test.benchmark == 'lfw':
+#                self.lists = test.lfw.build_testset()
+#            else:
+#                raise Exception("No such benchmark: {}".format(config.test.benchmark))
+#            self.num_img = len(self.lists)
+#            self.metas = None
+#        else: # extract
+#            with open(config.extract_info.data_list, 'r') as f:
+#                lines = f.readlines()
+#                self.lists = [os.path.join(config.extract_info.data_root, l.strip()) for l in lines]
+#            self.num_img = len(self.lists)
+#            self.metas = None
+#
+#        normalize = transforms.Normalize(mean=[0.5, 0.5, 0.5], std=[0.3125, 0.3125, 0.3125])
+#        self.transforms = transforms.Compose([transforms.ToTensor(), normalize])
+#        self.initialized = False
+# 
+#    def __len__(self):
+#        return self.num_img
+# 
+#    def __init_memcached(self):
+#        if not self.initialized:
+#            server_list_config_file = "{}/server_list.conf".format(self.config.memcached_client)
+#            client_config_file = "{}/client.conf".format(self.config.memcached_client)
+#            self.mclient = mc.MemcachedClient.GetInstance(server_list_config_file, client_config_file)
+#            self.initialized = True
+#
+#    def _read_one(self, idx=None):
+#        if idx is None:
+#            idx = np.random.randint(self.num_img)
+#        filename = self.lists[idx]
+#        if self.metas is not None:
+#            label = self.metas[idx]
+#        else:
+#            label = 0
+#        try:
+#            value = mc.pyvector()
+#            self.mclient.Get(filename, value)
+#            value_str = mc.ConvertBuffer(value)
+#            img = pil_loader(value_str)
+#        except:
+#            print('Read image[{}] failed ({})'.format(idx, filename))
+#            return self._read_one()
+#        else:
+#            return img, label
+#            
+#    def __getitem__(self, idx):
+#        self.__init_memcached()
+#        ## memcached
+#        if self.config.memcached:
+#            img, label = self._read_one(idx)
+#        else:
+#            filename = self.lists[idx]
+#            if self.metas is not None:
+#                label = self.metas[idx]
+#            else:
+#                label = 0
+#            if not os.path.isfile(filename):
+#                raise Exception('Read image[{}] failed ({})'.format(idx, filename))
+#            img = Image.open(filename).convert('RGB')
+#
+#        ## transform & aug
+#        if self.phase == 'train' and self.config.train.augmentation['flip_aug']:
+#            if np.random.rand() < 0.5:
+#                img = img.transpose(Image.FLIP_LEFT_RIGHT)
+#        if self.phase == 'train':
+#            scale_height_diff = (np.random.rand() * 2 - 1) * self.config.train.augmentation['scale_aug']
+#            scale_width_diff = (np.random.rand() * 2 - 1) * self.config.train.augmentation['scale_aug']
+#            trans_diff_x = (np.random.rand() * 2 - 1) * self.config.train.augmentation['trans_aug']
+#            trans_diff_y = (np.random.rand() * 2 - 1) * self.config.train.augmentation['trans_aug']
+#        else:
+#            scale_height_diff = 0.
+#            scale_width_diff = 0.
+#            trans_diff_x = 0.
+#            trans_diff_y = 0.
+#
+#        crop_height_aug = self.config.transform.crop_size * (1 + scale_height_diff)
+#        crop_width_aug = self.config.transform.crop_size * (1 + scale_width_diff)
+#        center = (img.width / 2. * (1 + trans_diff_x), (img.height / 2. + self.config.transform.crop_center_y_offset) * (1 + trans_diff_y))
+#
+#        if center[0] < crop_width_aug / 2:
+#            crop_width_aug = center[0] * 2 - 0.5
+#        if center[1] < crop_height_aug / 2:
+#            crop_height_aug = center[1] * 2 - 0.5
+#        if center[0] + crop_width_aug / 2 >= img.width:
+#            crop_width_aug = (img.width - center[0]) * 2 - 0.5
+#        if center[1] + crop_height_aug / 2 >= img.height:
+#            crop_height_aug = (img.height - center[1]) * 2 - 0.5
+#
+#        rect = (center[0] - crop_width_aug / 2, center[1] - crop_height_aug / 2,
+#                center[0] + crop_width_aug / 2, center[1] + crop_height_aug / 2)
+#        img = img.crop(rect)
+#        img = img.resize((self.config.transform.final_size, self.config.transform.final_size), Image.BICUBIC)
+#
+#        if False: #DEBUG
+#            img.save("output/{}.jpg".format(idx))
+#
+#        img = self.transforms(img)
+#        return img, label
 
 class GivenSizeSampler(Sampler):
     '''
