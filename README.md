@@ -127,6 +127,7 @@ Online testing and visualization with Tensorboard.
 | densenet-121-arc | 0.9973 | 0.9979 | 0.9601 | 0.9728   | 0.9558 | 0.9063 | 0.9496  | 0.9287   |
 
 Note that the hyper-parameters are not adjusted to optimal. Hence, they are not the state-of-the-art face recognition models.
+You may download those pre-trained models [here](https://drive.google.com/open?id=1bJqhFBMkxqYsyIgWaEGOdoBkbmLBZ1zq).
 
 ### Bibtex
 
