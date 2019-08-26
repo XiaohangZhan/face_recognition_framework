@@ -22,7 +22,6 @@ from tensorboardX import SummaryWriter
 import models
 from datasets import GivenSizeSampler, BinDataset, FileListLabeledDataset, FileListDataset
 from utils import AverageMeter, load_state, save_state, log, normalize, bin_loader
-import test
 from evaluation import evaluate, test_megaface
 
 model_names = sorted(name for name in models.backbones.__dict__
@@ -426,32 +425,32 @@ def evaluation(test_loader, model, num, outfeat_fn, benchmark):
         return acc.mean()
 
 
-def evaluation_old(test_loader, model, num, outfeat_fn, benchmark):
-    load_feat = False
-    if not os.path.isfile(outfeat_fn) or not load_feat:
-        features = extract(test_loader, model, num, outfeat_fn)
-    else:
-        log("Loading features: {}".format(outfeat_fn))
-        features = np.fromfile(outfeat_fn, dtype=np.float32).reshape(-1, args.model.feature_dim)
-
-    if benchmark == "megaface":
-        r = test.test_megaface(features)
-        log(' * Megaface: 1e-6 [{}], 1e-5 [{}], 1e-4 [{}]'.format(r[-1], r[-2], r[-3]))
-        with open(outfeat_fn[:-4] + ".txt", 'w') as f:
-            f.write(' * Megaface: 1e-6 [{}], 1e-5 [{}], 1e-4 [{}]'.format(r[-1], r[-2], r[-3]))
-        return r[-1]
-    elif benchmark == "ijba":
-        r = test.test_ijba(features)
-        log(' * IJB-A: {} [{}], {} [{}], {} [{}]'.format(r[0][0], r[0][1], r[1][0], r[1][1], r[2][0], r[2][1]))
-        with open(outfeat_fn[:-4] + ".txt", 'w') as f:
-            f.write(' * IJB-A: {} [{}], {} [{}], {} [{}]'.format(r[0][0], r[0][1], r[1][0], r[1][1], r[2][0], r[2][1]))
-        return r[2][1]
-    elif benchmark == "lfw":
-        r = test.test_lfw(features)
-        log(' * LFW: mean: {} std: {}'.format(r[0], r[1]))
-        with open(outfeat_fn[:-4] + ".txt", 'w') as f:
-            f.write(' * LFW: mean: {} std: {}'.format(r[0], r[1]))
-        return r[0]
+#def evaluation_old(test_loader, model, num, outfeat_fn, benchmark):
+#    load_feat = False
+#    if not os.path.isfile(outfeat_fn) or not load_feat:
+#        features = extract(test_loader, model, num, outfeat_fn)
+#    else:
+#        log("Loading features: {}".format(outfeat_fn))
+#        features = np.fromfile(outfeat_fn, dtype=np.float32).reshape(-1, args.model.feature_dim)
+#
+#    if benchmark == "megaface":
+#        r = test.test_megaface(features)
+#        log(' * Megaface: 1e-6 [{}], 1e-5 [{}], 1e-4 [{}]'.format(r[-1], r[-2], r[-3]))
+#        with open(outfeat_fn[:-4] + ".txt", 'w') as f:
+#            f.write(' * Megaface: 1e-6 [{}], 1e-5 [{}], 1e-4 [{}]'.format(r[-1], r[-2], r[-3]))
+#        return r[-1]
+#    elif benchmark == "ijba":
+#        r = test.test_ijba(features)
+#        log(' * IJB-A: {} [{}], {} [{}], {} [{}]'.format(r[0][0], r[0][1], r[1][0], r[1][1], r[2][0], r[2][1]))
+#        with open(outfeat_fn[:-4] + ".txt", 'w') as f:
+#            f.write(' * IJB-A: {} [{}], {} [{}], {} [{}]'.format(r[0][0], r[0][1], r[1][0], r[1][1], r[2][0], r[2][1]))
+#        return r[2][1]
+#    elif benchmark == "lfw":
+#        r = test.test_lfw(features)
+#        log(' * LFW: mean: {} std: {}'.format(r[0], r[1]))
+#        with open(outfeat_fn[:-4] + ".txt", 'w') as f:
+#            f.write(' * LFW: mean: {} std: {}'.format(r[0], r[1]))
+#        return r[0]
 
 
 if __name__ == '__main__':
