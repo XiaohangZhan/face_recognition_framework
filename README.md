@@ -55,7 +55,7 @@ Online testing and visualization with Tensorboard.
       ln -s ~/data/face_recognition/faces_webface_112x112 data/webface
       ```
       
-      Optionally, if you want to test on MegaFace. Download testing set from [here](https://www.dropbox.com/s/5ko2dcd1x7vn37w/megaface_testpack_v1.0.zip?dl=0) into your data storage folder, e.g., `~/data/face_recognition/`. Then:
+      Optionally, if you want to test on MegaFace. Download testing set from [here](https://drive.google.com/open?id=1e47P-u5hS7QGHP56YcMq5DoOLl_nxlPo) into your data storage folder, e.g., `~/data/face_recognition/`. Then:
       
       ```sh
       cd ~/data/face_recognition/
