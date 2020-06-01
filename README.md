@@ -51,6 +51,7 @@ Online testing and visualization with Tensorboard.
       cd ~/data/face_recognition/
       unzip faces_CASIA_112x112.zip
       cd - # back to the repo root
+      mkdir data
       python tools/convert_data.py -r ~/data/face_recognition/faces_webface_112x112 -o ~/data/face_recognition/faces_webface_112x112 # convert mxnet records into images
       ln -s ~/data/face_recognition/faces_webface_112x112 data/webface
       ```
