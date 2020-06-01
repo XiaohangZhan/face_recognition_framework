@@ -302,7 +302,10 @@ def train(train_loader, model, optimizer, epoch, loss_weight, tb_logger, count):
         loss = model(input_var, target_var, slice_idx)
 
         for k in range(num_tasks):
-            losses[k].update(loss[k].mean().data[0])
+            if torch.__version__ >= '1.1.0':
+                losses[k].update(loss[k].mean().item()) 
+            else:
+                losses[k].update(loss[k].mean().data[0])
 
         # compute gradient and do SGD step
         optimizer.zero_grad()
@@ -367,7 +370,10 @@ def validate(val_loader, model, criterion, epoch, loss_weight, train_len, tb_log
         loss = model(input_var, target_var, slice_idx)
 
         for k in range(num_tasks):
-            losses[k].update(loss[k].data[0])
+            if torch.__version__ >= '1.1.0':
+                losses[k].update(loss[k].item())
+            else:
+                losses[k].update(loss[k].data[0])
 
     log('Test epoch #{}    Time {}'.format(epoch, time.time() - start))
     for k in range(num_tasks):
