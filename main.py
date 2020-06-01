@@ -18,6 +18,7 @@ import torch.optim
 from torch.utils.data import DataLoader
 import torchvision.transforms as transforms
 from tensorboardX import SummaryWriter
+torch.multiprocessing.set_sharing_strategy('file_system')
 
 import models
 from datasets import GivenSizeSampler, BinDataset, FileListLabeledDataset, FileListDataset
